@@ -1,0 +1,129 @@
+"""
+JSON health endpoint wrapper around the MLflow scoring server.
+
+MLflow's built-in /health answers with a bare newline declared as
+application/json (the SageMaker ping contract: 200 = model loaded), which
+JSON clients reject. This wrapper fronts the scoring server so the
+platform-facing endpoints are:
+
+- GET  /health       -> {"status": "ok"} once the scoring server is up,
+                        {"status": "loading"} (HTTP 503) while the model
+                        loads, {"status": "error"} (HTTP 503) if the
+                        scoring server process died.
+- POST /invocations  -> forwarded unchanged to the scoring server.
+
+The scoring server itself runs unchanged as a subprocess on an internal
+port; the wrapper adds no inference logic, only the health response and
+the reverse proxy. Runs with `python -m src.deployment.serve`.
+"""
+
+import atexit
+import os
+import subprocess
+import sys
+import urllib.error
+import urllib.request
+
+import uvicorn
+from fastapi import FastAPI, Request, Response
+
+UPSTREAM_HOST = "127.0.0.1"
+UPSTREAM_PORT = int(os.environ.get("UPSTREAM_PORT", "5002"))
+PORT = int(os.environ.get("PORT", "5001"))
+MODEL_PATH = os.environ.get("MODEL_PATH", "/app/models/model")
+POLL_TIMEOUT = 1.0
+
+app = FastAPI(docs_url=None, openapi_url=None, redoc_url=None)
+_scoring_proc: subprocess.Popen | None = None
+
+
+def _upstream_health() -> int | None:
+    """Return the scoring server's /health status code, None if unreachable."""
+    try:
+        with urllib.request.urlopen(
+            f"http://{UPSTREAM_HOST}:{UPSTREAM_PORT}/health",
+            timeout=POLL_TIMEOUT,
+        ) as resp:
+            return resp.status
+    except urllib.error.HTTPError as e:
+        return e.code
+    except (urllib.error.URLError, TimeoutError, OSError):
+        return None
+
+
+@app.get("/health")
+def health():
+    if _scoring_proc is not None and _scoring_proc.poll() is not None:
+        return Response(
+            content='{"status": "error"}',
+            status_code=503,
+            media_type="application/json",
+        )
+    if _upstream_health() == 200:
+        return Response(
+            content='{"status": "ok"}', media_type="application/json"
+        )
+    return Response(
+        content='{"status": "loading"}',
+        status_code=503,
+        media_type="application/json",
+    )
+
+
+@app.post("/invocations")
+async def invocations(request: Request):
+    body = await request.body()
+    req = urllib.request.Request(
+        f"http://{UPSTREAM_HOST}:{UPSTREAM_PORT}/invocations",
+        data=body,
+        headers={"Content-Type": request.headers.get("content-type", "application/json")},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=300) as resp:
+            return Response(
+                content=resp.read(),
+                status_code=resp.status,
+                media_type=resp.headers.get("content-type", "application/json"),
+            )
+    except urllib.error.HTTPError as e:
+        return Response(
+            content=e.read(),
+            status_code=e.code,
+            media_type=e.headers.get("content-type", "application/json"),
+        )
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        return Response(
+            content=f'{{"status": "error", "detail": "{e}"}}',
+            status_code=502,
+            media_type="application/json",
+        )
+
+
+def _start_scoring_server() -> subprocess.Popen:
+    env = os.environ.copy()
+    env["MLFLOW_TRACKING_URI"] = env.get("MLFLOW_TRACKING_URI", "")
+    # The scoring server execs `uvicorn` through PATH; make sure the
+    # interpreter's bin directory (which holds uvicorn) is on it.
+    interpreter_bin = os.path.dirname(os.path.abspath(sys.executable))
+    env["PATH"] = os.pathsep.join([interpreter_bin, env.get("PATH", "")])
+    proc = subprocess.Popen(
+        [
+            sys.executable, "-m", "mlflow", "models", "serve",
+            "-m", MODEL_PATH,
+            "-p", str(UPSTREAM_PORT),
+            "--workers", "1",
+            "--host", UPSTREAM_HOST,
+            "--no-conda",
+        ],
+        env=env,
+    )
+    # uvicorn owns SIGTERM handling once it runs, so rely on atexit to
+    # stop the scoring server when the wrapper process exits.
+    atexit.register(lambda: proc.poll() is None and proc.terminate())
+    return proc
+
+
+if __name__ == "__main__":
+    _scoring_proc = _start_scoring_server()
+    uvicorn.run(app, host="0.0.0.0", port=PORT, log_level="info")
