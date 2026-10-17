@@ -30,6 +30,12 @@ ingress:
       match:
         path:
           prefix: /invocations
+    - component:
+        name: model-serve
+        preserve_path_prefix: true
+      match:
+        path:
+          prefix: /health
 
 services:
   - name: model-serve

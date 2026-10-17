@@ -91,32 +91,16 @@ jobs:
           MLFLOW_TRACKING_URI: http://127.0.0.1:5000
         run: python -m src.pipeline
 
-      # Export the pyfunc model (SimpleLoggingWrapper) from the training
-      # run. This is the flavor that serves /invocations with image input
-      # and logs inference for drift detection - not the raw PyTorch flavor.
+      # Export the pyfunc model (SimpleLoggingWrapper). This is the flavor
+      # that serves /invocations with image input and logs inference for
+      # drift detection - not the raw PyTorch flavor. src.deployment.export
+      # resolves the model the pipeline's promotion gate chose (Production
+      # alias), so a run the gate rejected is never silently served.
       - name: Export pyfunc model
         env:
           MLFLOW_TRACKING_URI: http://127.0.0.1:5000
         run: |
-          python - <<'EOF'
-          import mlflow
-
-          runs = mlflow.search_runs(
-              experiment_names=["vial_image_classification"],
-              max_results=1,
-              order_by=["start_time DESC"],
-          )
-          if runs.empty:
-              raise RuntimeError("No MLflow run found after training")
-          run_id = runs.iloc[0].run_id
-          mlflow.artifacts.download_artifacts(
-              artifact_uri=f"runs:/{run_id}/model_pyfunc",
-              dst_path="models",
-          )
-          print(f"Exported pyfunc model from run {run_id}")
-          EOF
-          rm -rf models/model
-          mv models/model_pyfunc models/model
+          python -m src.deployment.export
           # Stop the server so SQLite flushes its WAL before upload.
           pkill -f "mlflow server" || true
 
