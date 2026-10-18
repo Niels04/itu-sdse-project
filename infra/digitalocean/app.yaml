@@ -36,6 +36,12 @@ ingress:
       match:
         path:
           prefix: /health
+    - component:
+        name: model-serve
+        preserve_path_prefix: true
+      match:
+        path:
+          prefix: /drift
 
 services:
   - name: model-serve

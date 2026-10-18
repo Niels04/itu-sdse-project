@@ -14,6 +14,10 @@ RUN pip install --no-cache-dir .
 # pyfunc model committed by the CI train job
 COPY models/model /app/models/model
 
+# Baseline statistics written during training; the /drift endpoint of
+# src.deployment.serve compares live inference logs against them
+COPY artifacts/drift_baseline_stats.json /app/artifacts/drift_baseline_stats.json
+
 # App Platform component-to-component address of the tracking service
 ENV MLFLOW_TRACKING_URI=http://mlflow-tracking:5000
 EXPOSE 5001

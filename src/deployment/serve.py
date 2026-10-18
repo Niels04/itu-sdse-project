@@ -11,6 +11,12 @@ platform-facing endpoints are:
                         loads, {"status": "error"} (HTTP 503) if the
                         scoring server process died.
 - POST /invocations  -> forwarded unchanged to the scoring server.
+- GET  /drift        -> runs drift detection (KS tests) over the requests
+                        logged by the scoring server in this container and
+                        returns the results as JSON. The baseline
+                        statistics written during training are baked into
+                        the image. Optional ?days=N limits the window
+                        (default: 7 days).
 
 The scoring server itself runs unchanged as a subprocess on an internal
 port; the wrapper adds no inference logic, only the health response and
@@ -41,7 +47,10 @@ import urllib.request
 # scoring server uses them), so they are available without adding
 # anything to pyproject.toml.
 import uvicorn  # the web server: listens on PORT, calls the app per request
-from fastapi import FastAPI, Request, Response  # the HTTP app: maps paths to functions
+from fastapi import FastAPI, Query, Request, Response  # the HTTP app: maps paths to functions
+
+from ..config import DRIFT_DEFAULT_DAYS, INFERENCE_LOG_PATH
+from .check_drift import detect_drift, load_baseline_stats, load_inference_logs
 
 UPSTREAM_HOST = "127.0.0.1"
 UPSTREAM_PORT = int(os.environ.get("UPSTREAM_PORT", "5002"))
@@ -114,6 +123,21 @@ async def invocations(request: Request):
             status_code=502,
             media_type="application/json",
         )
+
+
+@app.get("/drift")
+def drift(days: int = Query(default=DRIFT_DEFAULT_DAYS, ge=1)):
+    """
+    Run drift detection over the requests logged by the scoring server.
+
+    Reuses the check_drift CLI's detection logic (KS tests on confidence
+    scores and class distribution); only the reporting differs: results
+    are returned as JSON instead of printed and logged to MLflow (there
+    is no tracking server in the deployment - the CLI covers that).
+    """
+    logs = load_inference_logs(INFERENCE_LOG_PATH)
+    baseline = load_baseline_stats()
+    return detect_drift(logs, days=days, baseline_stats=baseline)
 
 
 def _start_scoring_server() -> subprocess.Popen:

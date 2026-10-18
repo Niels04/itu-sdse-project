@@ -118,6 +118,16 @@ jobs:
           path: models/model
           retention-days: 7
 
+      # The /drift endpoint of the serving app compares live inference
+      # logs against these baseline statistics, so they travel with the
+      # model into the serving image.
+      - name: Upload drift baseline stats
+        uses: actions/upload-artifact@v4
+        with:
+          name: drift-baseline
+          path: artifacts/drift_baseline_stats.json
+          retention-days: 7
+
   build:
     needs: train
     runs-on: ubuntu-latest
@@ -137,6 +147,12 @@ jobs:
         with:
           name: model
           path: models/model
+
+      - name: Download drift baseline stats
+        uses: actions/download-artifact@v4
+        with:
+          name: drift-baseline
+          path: artifacts
 
       # GHCR instead of DOCR: public packages are free with no storage cap,
       # and the built-in GITHUB_TOKEN is the credential - no new secret.
