@@ -75,8 +75,16 @@ NUM_CLASSES = 2
 
 # Training configuration
 BATCH_SIZE = 32
-NUM_EPOCHS = 3
-LEARNING_RATE = 0.0001
+NUM_EPOCHS = 5
+LEARNING_RATE = 0.0003
+
+# Early stopping: stop training when validation macro-F1 has not improved
+# for this many consecutive epochs
+EARLY_STOP_PATIENCE = 2
+
+# ReduceLROnPlateau patience: halve the learning rate when validation
+# macro-F1 has not improved for this many consecutive epochs
+SCHEDULER_PATIENCE = 3
 
 # Transform parameters (ImageNet statistics)
 TRANSFORM_MEAN = [0.485, 0.456, 0.406]
@@ -100,8 +108,9 @@ def get_device():
             _DEVICE = "cpu"
     return _DEVICE
 
-# For backward compatibility, use the function or import torch when needed
-DEVICE = None  # Will be set to actual device when torch is available
+# For backward compatibility, resolve the device eagerly so modules that
+# import DEVICE as a default argument (e.g. train.py) get a real device
+DEVICE = get_device()
 
 # Dataset split ratios
 TRAIN_RATIO = 0.70

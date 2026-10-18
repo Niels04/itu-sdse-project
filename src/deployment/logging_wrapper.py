@@ -338,10 +338,10 @@ class SimpleLoggingWrapper(mlflow.pyfunc.PythonModel):
                 image_tensor = self.preprocess_image(image_input)
                 image_tensor = image_tensor.to(self.device)
                 
-                # Get raw model output
+                # Get raw model output (logit) and convert to probability
                 with torch.no_grad():
-                    output = self.model(image_tensor)
-                    prob = output.item()
+                    logit = self.model(image_tensor)
+                    prob = torch.sigmoid(logit).item()
                     pred = 1 if prob >= self.threshold else 0
                 
                 predictions.append(int(pred))

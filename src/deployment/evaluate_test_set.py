@@ -94,9 +94,9 @@ def main():
                 img = img.convert('RGB')
             tensor = transform(img).unsqueeze(0)
 
-        # Run model inference
+        # Run model inference (model outputs raw logits)
         with torch.no_grad():
-            probability = model(tensor).item()
+            probability = torch.sigmoid(model(tensor)).item()
 
         # Predict class
         predicted_class = 1 if probability >= threshold else 0
