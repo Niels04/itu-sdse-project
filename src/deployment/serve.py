@@ -15,6 +15,19 @@ platform-facing endpoints are:
 The scoring server itself runs unchanged as a subprocess on an internal
 port; the wrapper adds no inference logic, only the health response and
 the reverse proxy. Runs with `python -m src.deployment.serve`.
+
+Background for readers who only know `mlflow models serve`: that command
+also starts a web server under the hood (it launches a uvicorn process
+running an app built with FastAPI - the same stack used here). This file
+just does the same thing explicitly so we control the response bodies:
+
+- FastAPI is a library for defining HTTP endpoints (like the /health
+  function below) as plain Python functions.
+- uvicorn is the web server that listens on a port and calls those
+  functions for each incoming request.
+- MLflow's own server is a FastAPI/uvicorn app whose /health handler is
+  fixed to return a bare newline; we cannot change its response, so we
+  put our own app in front and forward /invocations to it.
 """
 
 import atexit
@@ -24,8 +37,11 @@ import sys
 import urllib.error
 import urllib.request
 
-import uvicorn
-from fastapi import FastAPI, Request, Response
+# FastAPI/uvicorn are installed as MLflow dependencies (MLflow's own
+# scoring server uses them), so they are available without adding
+# anything to pyproject.toml.
+import uvicorn  # the web server: listens on PORT, calls the app per request
+from fastapi import FastAPI, Request, Response  # the HTTP app: maps paths to functions
 
 UPSTREAM_HOST = "127.0.0.1"
 UPSTREAM_PORT = int(os.environ.get("UPSTREAM_PORT", "5002"))
@@ -126,4 +142,8 @@ def _start_scoring_server() -> subprocess.Popen:
 
 if __name__ == "__main__":
     _scoring_proc = _start_scoring_server()
+    # uvicorn.run starts the web server: it listens on 0.0.0.0:PORT and
+    # dispatches each request to the matching FastAPI function above.
+    # (This is the equivalent of what `mlflow models serve` does
+    # internally, just with our app instead of MLflow's.)
     uvicorn.run(app, host="0.0.0.0", port=PORT, log_level="info")
