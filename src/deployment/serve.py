@@ -11,6 +11,7 @@ platform-facing endpoints are:
                         loads, {"status": "error"} (HTTP 503) if the
                         scoring server process died.
 - POST /invocations  -> forwarded unchanged to the scoring server.
+- POST /infer        -> alias of /invocations (same forwarding).
 - GET  /drift        -> runs drift detection (KS tests) over the requests
                         logged by the scoring server in this container and
                         returns the results as JSON. The baseline
@@ -96,6 +97,7 @@ def health():
 
 
 @app.post("/invocations")
+@app.post("/infer")
 async def invocations(request: Request):
     body = await request.body()
     req = urllib.request.Request(

@@ -35,6 +35,12 @@ ingress:
         preserve_path_prefix: true
       match:
         path:
+          prefix: /infer
+    - component:
+        name: model-serve
+        preserve_path_prefix: true
+      match:
+        path:
           prefix: /health
     - component:
         name: model-serve
