@@ -264,34 +264,22 @@ image_tensor = transform(image)
 
 ### **For Data Loading**
 ```python
-# Using the organized dataset with our pipeline
-from src.data.fetch import load_image_dataset
-
-# Load dataset
-dataset = load_image_dataset()  # Returns list of (image_path, label) tuples
-
-# Or use the metadata directly
+# Use the metadata directly
 import pandas as pd
 metadata = pd.read_csv("data/images/metadata.csv")
 ```
 
 ---
 
-## **Dataset Organization Script**
+## **Dataset Organization**
 
-The dataset was organized using the script `src/data/organize_dataset.py`, which:
+The dataset was organized in a one-off step, which:
 
 1. Scans the raw dataset directory structure
 2. Extracts one representative image per vial
 3. Creates the organized directory structure
 4. Generates the metadata CSV file
 5. Validates all images and metadata
-
-### **Running the Script**
-```bash
-# From project root
-python3 src/data/organize_dataset.py
-```
 
 ### **Output**
 - Organized images in `data/images/raw/`

@@ -33,8 +33,9 @@ The repository linked in the submission should contain:
 
 You are given the following material:
 - Python monolith (see `notebooks` folder)
-- Raw input data (see `notebooks/artifacts` folder)
+- Raw input data (pulled from the object store by the training notebook)
 - GitHub action to test model inference (see [`model-validator`](https://github.com/lasselundstenjensen/itu-sdse-project-model-validator) action)
+- DigitalOcean App Platform spec for the deployment (see `infra/digitalocean/app.yaml`)
 
 ## Outputs
 

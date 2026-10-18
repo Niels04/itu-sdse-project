@@ -2,7 +2,7 @@
 
 ## What this repo is
 
-The **student-facing** artifact lives on `main` and in `README.md`, `docs/`, `notebooks/`, `.github/workflows/`, `action.yml`. Students fork it and turn the messy `notebooks/main.ipynb` monolith into a modular Python project with a Dagger workflow, a GitHub Actions training pipeline, and a model artifact validated by the [`model-validator`](https://github.com/lasselundstenjensen/itu-sdse-project-model-validator) action.
+The **student-facing** artifact lives on `main` and in `README.md`, `docs/`, `notebooks/`, `action.yml`. Students fork it and turn the messy `notebooks/01_training.ipynb` + `notebooks/02_deployment.ipynb` monolith into a modular Python project with a Dagger workflow, a GitHub Actions training pipeline, and a model artifact validated by the [`model-validator`](https://github.com/lasselundstenjensen/itu-sdse-project-model-validator) action.
 
 **Do not restructure the student inputs.** They are inputs to an exam and must stay recognisable.
 

@@ -41,11 +41,6 @@ ENV/
 # Jupyter
 .ipynb_checkpoints/
 
-# DVC
-.dvc/config.local
-.dvc/tmp
-.dvc/cache
-
 # Raw dataset files (large binary files - ICPR 2024)
 data/Clean/
 data/Glass/
