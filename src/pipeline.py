@@ -1,4 +1,3 @@
-import sys
 import torch
 import mlflow
 from torch.utils.data import DataLoader
@@ -9,8 +8,8 @@ from .data.features import create_features
 from .models.train import train_models
 from .models.registry import register_models
 from .deployment.deploy import deploy_model, transition_to_production, set_model_alias
-from .utils import print_section_header
-from .config import MLFLOW_TRACKING_URI, EXPERIMENT_NAME, MODEL_NAME
+from .utils import print_section_header, setup_mlflow_tracking
+from .config import EXPERIMENT_NAME, MODEL_NAME
 
 
 def get_production_model():
@@ -20,7 +19,7 @@ def get_production_model():
     Returns (model_uri, version) or (None, None) if no Production model exists.
     """
     from mlflow.tracking import MlflowClient
-    
+
     client = MlflowClient()
     
     # First, try to get the model with alias "Production"
@@ -228,11 +227,8 @@ def run_full_pipeline():
     print_section_header("FULL IMAGE CLASSIFICATION PIPELINE")
     print("Starting complete pipeline execution...\n")
 
-    # Initialize MLflow tracking
-    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-    experiment = mlflow.get_experiment_by_name(EXPERIMENT_NAME)
-    if experiment is None:
-        experiment = mlflow.create_experiment(EXPERIMENT_NAME)
+    # Initialize MLflow tracking (local SQLite state by default - see config.py)
+    setup_mlflow_tracking(experiment_name=EXPERIMENT_NAME)
 
     with mlflow.start_run(run_name="full_pipeline") as run:
         train_loader, val_loader, test_loader = run_data_pipeline()

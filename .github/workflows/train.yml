@@ -15,7 +15,7 @@ on:
 permissions:
   contents: read
   actions: write  # restore the state artifact and dispatch the deploy workflow
-  packages: write  # push the tracking and serving images to GHCR
+  packages: write  # push the serving image to GHCR
 
 # Serialize training: each run builds on the MLflow state uploaded by the
 # previous run, so two overlapping runs would race on the model registry.
@@ -70,25 +70,11 @@ jobs:
           fi
           ls -la mlflow-state
 
-      # Local tracking server on the runner, mirroring the deployed layout.
-      # --serve-artifacts stores artifact URIs as location-independent
-      # mlflow-artifacts:/ paths, keeping the database portable.
-      - name: Start local MLflow tracking server
-        run: |
-          mlflow server \
-              --backend-store-uri sqlite:///$PWD/mlflow-state/mlflow.db \
-              --artifacts-destination file:///$PWD/mlflow-state/artifacts \
-              --serve-artifacts \
-              --host 127.0.0.1 \
-              --port 5000 &
-          for _ in $(seq 1 60); do
-              curl -sf http://127.0.0.1:5000/health && break
-              sleep 1
-          done
-
+      # Training logs serverless to the local SQLite state directory
+      # (mlflow-state/, see src/config.py) - the same way it does on a
+      # laptop. The runner workspace path is stable across runs, so the
+      # absolute artifact paths stored in the database keep resolving.
       - name: Run training pipeline
-        env:
-          MLFLOW_TRACKING_URI: http://127.0.0.1:5000
         run: python -m src.pipeline
 
       # Export the pyfunc model (SimpleLoggingWrapper). This is the flavor
@@ -97,12 +83,7 @@ jobs:
       # resolves the model the pipeline's promotion gate chose (Production
       # alias), so a run the gate rejected is never silently served.
       - name: Export pyfunc model
-        env:
-          MLFLOW_TRACKING_URI: http://127.0.0.1:5000
-        run: |
-          python -m src.deployment.export
-          # Stop the server so SQLite flushes its WAL before upload.
-          pkill -f "mlflow server" || true
+        run: python -m src.deployment.export
 
       - name: Upload MLflow state
         uses: actions/upload-artifact@v4
@@ -136,12 +117,6 @@ jobs:
       # Dockerfiles, pyproject and src package for the serving image.
       - uses: actions/checkout@v4
 
-      - name: Download MLflow state
-        uses: actions/download-artifact@v4
-        with:
-          name: mlflow-state
-          path: mlflow-state
-
       - name: Download exported model
         uses: actions/download-artifact@v4
         with:
@@ -168,20 +143,15 @@ jobs:
         run: |
           TAG="sha-${GITHUB_SHA:0:12}"
           REG="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}"
-          docker build -f docker/Dockerfile.tracking \
-              -t "$REG/mlflow-tracking:$TAG" \
-              -t "$REG/mlflow-tracking:latest" .
           docker build -f docker/Dockerfile.model-serve \
               -t "$REG/model-serve:$TAG" \
               -t "$REG/model-serve:latest" .
-          docker push "$REG/mlflow-tracking:$TAG"
-          docker push "$REG/mlflow-tracking:latest"
           docker push "$REG/model-serve:$TAG"
           docker push "$REG/model-serve:latest"
 
           # Public package storage is free, so old tags are kept: they give
           # a rollback target and a record of what was deployed.
-          echo "Pushed $REG/mlflow-tracking and $REG/model-serve at $TAG"
+          echo "Pushed $REG/model-serve at $TAG"
 
   # Chain the deploy workflow instead of using workflow_run, which GitHub
   # only fires when deploy.yml exists on the default branch - it never

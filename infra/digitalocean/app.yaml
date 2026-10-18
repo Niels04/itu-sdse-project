@@ -10,8 +10,8 @@ region: fra1
 # is publicly downloadable.
 #
 # There is no deployed MLflow tracking server: best-model selection happens
-# at training time in CI (the train job runs its own MLflow server against
-# the state carried in workflow artifacts), and serving does not need one -
+# at training time in CI (the train job logs to the local SQLite state
+# carried in workflow artifacts), and serving does not need one -
 # inference logging goes to a local file in the container and is discarded.
 #
 # Top-level ingress rules instead of per-service routes: routes strip the

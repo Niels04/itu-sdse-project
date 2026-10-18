@@ -12,7 +12,7 @@ from ..config import (
     ARTIFACT_DIR,
     IMAGE_DATA_DIR,
     METADATA_PATH,
-    MLRUNS_DIR,
+    MLFLOW_STATE_DIR,
 )
 
 BASE_URL = "https://itudsip.hel1.your-objectstorage.com/data"
@@ -157,17 +157,15 @@ def pull_data_from_dvc() -> None:
 
 def setup_artifacts() -> None:
     """
-    Create artifact and MLflow directories.
+    Create artifact and MLflow state directories.
 
     Creates the following directories if they don't exist:
     - artifacts/ (for data and model artifacts)
-    - mlruns/ (for MLflow tracking)
-    - mlruns/.trash/ (for MLflow cleanup)
+    - mlflow-state/ (for local MLflow tracking - SQLite store + artifacts)
     - data/images/raw/ (for raw image storage)
     """
     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
-    MLRUNS_DIR.mkdir(parents=True, exist_ok=True)
-    (MLRUNS_DIR / ".trash").mkdir(parents=True, exist_ok=True)
+    MLFLOW_STATE_DIR.mkdir(parents=True, exist_ok=True)
     IMAGE_DATA_DIR.mkdir(parents=True, exist_ok=True)
     print("Created artifacts and image directories")
 

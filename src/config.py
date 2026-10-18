@@ -25,8 +25,10 @@ MAX_DATE = "2024-01-31"
 # Base directory for artifacts (relative to project root)
 ARTIFACT_DIR = Path("./artifacts")
 
-# MLflow tracking directory
-MLRUNS_DIR = Path("./mlruns")
+# Local MLflow state directory (SQLite backend store + artifacts). Created
+# automatically; gitignored. All tracking - runs, metrics, model registry -
+# lives here and requires no MLflow server process.
+MLFLOW_STATE_DIR = Path("./mlflow-state")
 
 # Image data paths
 IMAGE_DATA_DIR = Path("./data/images/raw")
@@ -153,11 +155,24 @@ INFERENCE_LOG_PATH = ARTIFACT_DIR / "inference_log.json"
 DRIFT_DEFAULT_DAYS = 7
 
 # =============================================================================
-# MLFLOW SERVER CONFIGURATION
+# MLFLOW TRACKING CONFIGURATION
 # =============================================================================
 
-# MLflow tracking URI - local server (overridable via MLFLOW_TRACKING_URI env var)
-MLFLOW_TRACKING_URI = os.environ.get("MLFLOW_TRACKING_URI", "http://127.0.0.1:5000")
+# Tracking happens locally by default: a SQLite database under MLFLOW_STATE_DIR
+# plus artifacts in MLFLOW_STATE_DIR/artifacts. No MLflow server is needed for
+# training, the model registry, or serving. Set the MLFLOW_TRACKING_URI
+# environment variable to point at a server (or another backend) instead.
+MLFLOW_TRACKING_URI = os.environ.get(
+    "MLFLOW_TRACKING_URI", f"sqlite:///{MLFLOW_STATE_DIR}/mlflow.db"
+)
+
+# Artifact location used when the experiment is first created. Resolved
+# relative to the working directory, so run everything from the project root.
+# (MLflow stores the resolved absolute path in the database - move the repo
+# and old artifact links break, but new runs are unaffected.)
+MLFLOW_ARTIFACT_LOCATION = os.environ.get(
+    "MLFLOW_ARTIFACT_LOCATION", str(MLFLOW_STATE_DIR / "artifacts")
+)
 
 
 if __name__ == "__main__":
@@ -184,6 +199,7 @@ if __name__ == "__main__":
     print(f"  Feature Layer: {DRIFT_FEATURE_LAYER}")
     print(f"\nMLflow Configuration:")
     print(f"  Tracking URI: {MLFLOW_TRACKING_URI}")
+    print(f"  Artifact location: {MLFLOW_ARTIFACT_LOCATION}")
     print(f"\nInference Logging Configuration:")
     print(f"  Log Path: {INFERENCE_LOG_PATH}")
     print(f"  Drift Default Days: {DRIFT_DEFAULT_DAYS}")

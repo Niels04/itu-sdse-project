@@ -11,15 +11,14 @@ COPY pyproject.toml README.md ./
 COPY src/ ./src/
 RUN pip install --no-cache-dir .
 
-# pyfunc model committed by the CI train job
+# pyfunc model exported by training (src.deployment.export); built by the CI
+# train job or produced by a local pipeline run
 COPY models/model /app/models/model
 
 # Baseline statistics written during training; the /drift endpoint of
 # src.deployment.serve compares live inference logs against them
 COPY artifacts/drift_baseline_stats.json /app/artifacts/drift_baseline_stats.json
 
-# App Platform component-to-component address of the tracking service
-ENV MLFLOW_TRACKING_URI=http://mlflow-tracking:5000
 EXPOSE 5001
 
 # One worker: importing torch is slow and memory-heavy, and several

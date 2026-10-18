@@ -20,7 +20,6 @@ from scipy.stats import ks_2samp
 from mlflow.tracking import MlflowClient
 
 from ..config import (
-    MLFLOW_TRACKING_URI,
     INFERENCE_LOG_PATH,
     DRIFT_DEFAULT_DAYS,
     DRIFT_BASELINE_STATS_PATH,
@@ -31,9 +30,14 @@ from ..config import (
 
 
 def setup_mlflow() -> MlflowClient:
-    """Setup MLflow tracking and return a client."""
-    import mlflow
-    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    """Setup MLflow tracking and return a client.
+
+    Uses the local state directory by default (see src/config.py); no
+    MLflow server is needed.
+    """
+    from ..utils import setup_mlflow_tracking
+
+    setup_mlflow_tracking()
     return MlflowClient()
 
 

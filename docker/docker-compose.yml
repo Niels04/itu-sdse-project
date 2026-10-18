@@ -1,44 +1,39 @@
-services:
-  mlflow-tracking:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.tracking
-    ports:
-      - "5002:5000"   # local: avoid Spotify conflict
-    volumes:
-      - mlflow-data:/mlflow
-    networks:
-      - mlflow-net
+# Serving stack: the model server only, plus an on-demand training profile.
+#
+# There is no MLflow tracking service: training logs to the local SQLite
+# state directory (./mlflow-state, see src/config.py), and serving never
+# contacts MLflow - the exported pyfunc model is baked into the image and
+# inference requests are logged to a local JSON file.
+#
+# The `train` service runs the pipeline and the export step, so after a
+# training run ./models/model and ./artifacts/drift_baseline_stats.json
+# exist on the host and the model-serve image can be rebuilt:
+#
+#   docker compose -f docker/docker-compose.yml run --rm train
+#   docker compose -f docker/docker-compose.yml build model-serve
+#   docker compose -f docker/docker-compose.yml up -d
+#
+# The MLflow state (run history + model registry) persists in the
+# mlflow-state volume across training runs.
 
-  mlflow-model-serve:
+services:
+  model-serve:
     build:
       context: ..
       dockerfile: docker/Dockerfile.model-serve
     ports:
       - "5001:5001"
-    environment:
-      - MLFLOW_TRACKING_URI=http://mlflow-tracking:5000
-    depends_on:
-      - mlflow-tracking
-    networks:
-      - mlflow-net
 
   train:
     build:
       context: ..
       dockerfile: docker/Dockerfile.train
-    environment:
-      - MLFLOW_TRACKING_URI=http://mlflow-tracking:5000
-    depends_on:
-      - mlflow-tracking
-    networks:
-      - mlflow-net
+    volumes:
+      - mlflow-state:/app/mlflow-state
+      - ../models:/app/models
+      - ../artifacts:/app/artifacts
     profiles:
       - train
 
 volumes:
-  mlflow-data:
-
-networks:
-  mlflow-net:
-    driver: bridge
+  mlflow-state:

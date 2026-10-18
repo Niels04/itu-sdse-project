@@ -278,6 +278,48 @@ def print_dataframe_info(df: pd.DataFrame, name: str = "DataFrame") -> None:
     print(f"  Dtypes:\n{df.dtypes}")
 
 
+# =============================================================================
+# MLFLOW SETUP
+# =============================================================================
+
+def setup_mlflow_tracking(experiment_name: str = None) -> None:
+    """
+    Point MLflow at the local state directory and select the experiment.
+
+    Creates the state directory (SQLite cannot open its database in a
+    missing directory), sets the tracking URI from config, and creates the
+    experiment - with an explicit artifact location inside the state
+    directory - if it does not exist yet. With the default config this
+    requires no MLflow server; see src/config.py.
+
+    Parameters
+    ----------
+    experiment_name : str, optional
+        Name of the experiment to select. If None, only the tracking URI
+        is set.
+    """
+    import mlflow
+
+    from .config import (
+        MLFLOW_ARTIFACT_LOCATION,
+        MLFLOW_STATE_DIR,
+        MLFLOW_TRACKING_URI,
+    )
+
+    MLFLOW_STATE_DIR.mkdir(parents=True, exist_ok=True)
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+
+    if experiment_name is None:
+        return
+
+    experiment = mlflow.get_experiment_by_name(experiment_name)
+    if experiment is None:
+        mlflow.create_experiment(
+            experiment_name, artifact_location=MLFLOW_ARTIFACT_LOCATION
+        )
+    mlflow.set_experiment(experiment_name)
+
+
 if __name__ == "__main__":
     """Test utility functions when run directly."""
     print("Testing utility functions...")

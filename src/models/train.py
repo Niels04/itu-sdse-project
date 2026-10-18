@@ -45,7 +45,6 @@ from ..config import (
     EARLY_STOP_PATIENCE,
     EXPERIMENT_NAME,
     LEARNING_RATE,
-    MLFLOW_TRACKING_URI,
     MODEL_RESULTS_PATH,
     NUM_CLASSES,
     NUM_EPOCHS,
@@ -60,6 +59,7 @@ XGBOOST_MODEL_PATH = ARTIFACT_DIR / "xgboost_model.json"
 LR_MODEL_PATH = ARTIFACT_DIR / "logistic_regression_model.pkl"
 from ..utils import (
     print_section_header,
+    setup_mlflow_tracking,
     tensor_to_numpy,
 )
 from .evaluate import (
@@ -151,30 +151,15 @@ def setup_mlflow() -> str:
         The experiment name that was set.
     """
     print(f"Setting up MLflow experiment: {EXPERIMENT_NAME}")
-    print(f"Setting MLflow tracking URI: {MLFLOW_TRACKING_URI}")
 
-    # Set tracking URI
-    try:
-        mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-        print(f"MLflow tracking URI set to: {mlflow.get_tracking_uri()}")
-    except Exception as e:
-        print(f"Warning: Could not set MLflow tracking URI: {e}")
+    # Set the tracking URI (local SQLite state by default - no server
+    # needed, see src/config.py) and create the experiment if missing.
+    setup_mlflow_tracking(experiment_name=EXPERIMENT_NAME)
 
     # End any active runs to avoid conflicts
     if mlflow.active_run():
         mlflow.end_run()
         print("Ended previous active MLflow run")
-
-    # Ensure directories exist
-    ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
-    Path("./mlruns").mkdir(parents=True, exist_ok=True)
-    Path("./mlruns/.trash").mkdir(parents=True, exist_ok=True)
-
-    # Set experiment
-    try:
-        mlflow.set_experiment(EXPERIMENT_NAME)
-    except Exception as e:
-        print(f"Warning: Could not set MLflow experiment: {e}")
 
     print(f"MLflow experiment set to: {EXPERIMENT_NAME}")
     return EXPERIMENT_NAME

@@ -1,9 +1,11 @@
 #!/bin/bash
 
 # Test Inference Script for all images in data/test/
-# This script sends each test image to the model server and compares predictions with expected labels
+# This script sends each test image (base64-encoded, the portable contract
+# the model server expects - see src/deployment/logging_wrapper.py) to the
+# model server and compares predictions with expected labels
 
-MODEL_SERVER_URL="http://localhost:5001/invoke"
+MODEL_SERVER_URL="http://localhost:5001/invocations"
 TEST_DATA_DIR="./data/test"
 LOG_FILE="./logs/inference_test_results.log"
 
@@ -61,11 +63,13 @@ for IMAGE_FILE in "${TEST_DATA_DIR}"/*.jpg; do
     
     echo "  Expected: class=${EXPECTED_LABEL} (${EXPECTED_CLASS})"
     
-    # Send image path to model server
-    # Using the MLflow model server format: {"data": ["path/to/image.jpg"]}
+    # Send the image as base64-encoded bytes to the model server
+    # ({"instances": [...]} is the contract parsed by the pyfunc wrapper;
+    # a raw file path only works when the file exists inside the server)
+    B64=$(base64 "$IMAGE_FILE" | tr -d '\n')
     RESPONSE=$(curl -s -X POST "${MODEL_SERVER_URL}" \
         -H "Content-Type: application/json" \
-        -d "{\"data\": [\"${IMAGE_FILE}\"]}" 2>&1)
+        -d "{\"instances\": [\"${B64}\"]}" 2>&1)
     
     # Check if curl succeeded
     if [ $? -ne 0 ]; then

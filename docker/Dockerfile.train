@@ -3,5 +3,7 @@ WORKDIR /app
 COPY pyproject.toml .
 RUN pip install --no-cache-dir -e .
 COPY src/ ./src/
-ENV MLFLOW_TRACKING_URI=http://mlflow-tracking:5000
-CMD ["python", "-m", "src.pipeline"]
+# Training logs to the local MLflow state directory (no tracking server -
+# see src/config.py). Mount a volume at /app/mlflow-state to keep the run
+# history and model registry across runs.
+CMD ["sh", "-c", "python -m src.pipeline && python -m src.deployment.export"]

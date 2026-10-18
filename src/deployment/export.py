@@ -24,7 +24,8 @@ from pathlib import Path
 import mlflow
 from mlflow.tracking import MlflowClient
 
-from ..config import ARTIFACT_PATH, EXPERIMENT_NAME, MLFLOW_TRACKING_URI, MODEL_NAME
+from ..config import ARTIFACT_PATH, EXPERIMENT_NAME, MODEL_NAME
+from ..utils import setup_mlflow_tracking
 
 DEFAULT_DST = "models/model"
 
@@ -108,7 +109,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    setup_mlflow_tracking()
     export_serving_model(args.dst)
 
 

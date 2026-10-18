@@ -16,7 +16,7 @@ import pandas as pd
 import torch
 from PIL import Image
 from torchvision import transforms
-from src.models.train import SimpleCNN
+from ..models.train import SimpleCNN
 
 
 def main():

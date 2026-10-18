@@ -144,7 +144,6 @@ def drift(days: int = Query(default=DRIFT_DEFAULT_DAYS, ge=1)):
 
 def _start_scoring_server() -> subprocess.Popen:
     env = os.environ.copy()
-    env["MLFLOW_TRACKING_URI"] = env.get("MLFLOW_TRACKING_URI", "")
     # The scoring server execs `uvicorn` through PATH; make sure the
     # interpreter's bin directory (which holds uvicorn) is on it.
     interpreter_bin = os.path.dirname(os.path.abspath(sys.executable))
