@@ -115,9 +115,6 @@ TEST_RATIO = 0.15
 # Drift detection window size (number of samples to collect before checking)
 DRIFT_WINDOW_SIZE = 100
 
-# Population Stability Index (PSI) threshold for drift detection
-DRIFT_PSI_THRESHOLD = 0.2
-
 # Kolmogorov-Smirnov test p-value threshold for drift detection
 DRIFT_KS_PVALUE_THRESHOLD = 0.05
 
@@ -173,7 +170,6 @@ if __name__ == "__main__":
     print(f"Classification Threshold: {THRESHOLD}")
     print(f"\nDrift Detection Configuration:")
     print(f"  Window Size: {DRIFT_WINDOW_SIZE}")
-    print(f"  PSI Threshold: {DRIFT_PSI_THRESHOLD}")
     print(f"  KS P-value Threshold: {DRIFT_KS_PVALUE_THRESHOLD}")
     print(f"  Check Interval: {DRIFT_CHECK_INTERVAL}s")
     print(f"  Feature Layer: {DRIFT_FEATURE_LAYER}")

@@ -24,9 +24,9 @@ from ..config import (
     INFERENCE_LOG_PATH,
     DRIFT_DEFAULT_DAYS,
     DRIFT_BASELINE_STATS_PATH,
-    DRIFT_PSI_THRESHOLD,
     DRIFT_KS_PVALUE_THRESHOLD,
     MODEL_NAME,
+    EXPERIMENT_NAME,
 )
 
 
@@ -128,58 +128,6 @@ def load_baseline_stats() -> Optional[Dict[str, Any]]:
         return None
 
 
-def calculate_psi(current: np.ndarray, baseline: np.ndarray, bins: int = 20) -> float:
-    """
-    Calculate Population Stability Index (PSI) between current and baseline distributions.
-    
-    PSI measures how much a distribution has changed. Values:
-    - PSI < 0.1: No significant change
-    - 0.1 <= PSI < 0.2: Moderate change
-    - PSI >= 0.2: Significant change (drift detected)
-    
-    Parameters
-    ----------
-    current : np.ndarray
-        Current distribution values.
-    baseline : np.ndarray
-        Baseline distribution values.
-    bins : int
-        Number of bins for histogram bucketing.
-        
-    Returns
-    -------
-    float
-        PSI value (0 = no change, higher = more change).
-    """
-    # Remove NaN and infinite values
-    current = current[~np.isnan(current) & ~np.isinf(current)]
-    baseline = baseline[~np.isnan(baseline) & ~np.isinf(baseline)]
-    
-    if len(current) == 0 or len(baseline) == 0:
-        return 0.0
-    
-    # Use equal-width binning
-    baseline_counts, _ = np.histogram(baseline, bins=bins)
-    current_counts, _ = np.histogram(current, bins=bins)
-    
-    # Add small epsilon to avoid division by zero
-    epsilon = 1e-10
-    baseline_counts = baseline_counts.astype(float) + epsilon
-    current_counts = current_counts.astype(float) + epsilon
-    
-    # Calculate expected and actual proportions
-    baseline_proportion = baseline_counts / len(baseline)
-    current_proportion = current_counts / len(current)
-    
-    # Calculate PSI
-    psi_values = (current_proportion - baseline_proportion) * np.log(
-        current_proportion / baseline_proportion
-    )
-    psi = np.sum(psi_values)
-    
-    return float(psi)
-
-
 def calculate_confidence_metrics(confidences: List[float]) -> Dict[str, float]:
     """
     Calculate statistics for confidence scores.
@@ -225,14 +173,12 @@ def check_confidence_drift(
     """
     if not baseline_stats or 'confidence_statistics' not in baseline_stats:
         return {
-            'psi': 0.0,
             'ks_statistic': 0.0,
             'ks_pvalue': 1.0,
             'mean_diff': 0.0,
             'current_mean': 0.0,
             'baseline_mean': 0.0,
             'drift_detected': False,
-            'threshold_psi': DRIFT_PSI_THRESHOLD,
             'threshold_ks': DRIFT_KS_PVALUE_THRESHOLD,
         }
     
@@ -241,14 +187,12 @@ def check_confidence_drift(
     
     if len(current_confidences_array) < 2:
         return {
-            'psi': 0.0,
             'ks_statistic': 0.0,
             'ks_pvalue': 1.0,
             'mean_diff': 0.0,
-            'current_mean': 0.0,
+            'current_mean': float(np.mean(current_confidences_array)) if len(current_confidences_array) > 0 else 0.0,
             'baseline_mean': baseline.get('mean', 0.0),
             'drift_detected': False,
-            'threshold_psi': DRIFT_PSI_THRESHOLD,
             'threshold_ks': DRIFT_KS_PVALUE_THRESHOLD,
         }
     
@@ -256,31 +200,26 @@ def check_confidence_drift(
     baseline_std = baseline['std']
     current_mean = float(np.mean(current_confidences_array))
     
-    # Calculate PSI
-    baseline_samples = np.random.normal(baseline_mean, baseline_std, size=len(current_confidences_array))
-    psi = calculate_psi(current_confidences_array, baseline_samples, bins=20)
-    
     # Calculate KS test
+    baseline_samples = np.random.normal(baseline_mean, baseline_std, size=len(current_confidences_array))
     ks_statistic, ks_pvalue = ks_2samp(baseline_samples, current_confidences_array)
     
     # Calculate mean difference
     mean_diff = abs(current_mean - baseline_mean)
     
     # Check drift thresholds
-    psi_drift = psi > DRIFT_PSI_THRESHOLD
     ks_drift = ks_pvalue < DRIFT_KS_PVALUE_THRESHOLD
     mean_drift = mean_diff > 0.1
-    drift_detected = psi_drift or ks_drift or mean_drift
+    # bool() casts numpy.bool_ to a plain bool (JSON-serializable)
+    drift_detected = bool(ks_drift or mean_drift)
     
     return {
-        'psi': psi,
         'ks_statistic': float(ks_statistic),
         'ks_pvalue': float(ks_pvalue),
         'mean_diff': mean_diff,
         'current_mean': current_mean,
         'baseline_mean': baseline_mean,
         'drift_detected': drift_detected,
-        'threshold_psi': DRIFT_PSI_THRESHOLD,
         'threshold_ks': DRIFT_KS_PVALUE_THRESHOLD,
         'threshold_mean': 0.1,
     }
@@ -307,11 +246,9 @@ def check_class_distribution_drift(
     """
     if not baseline_stats or 'class_distribution' not in baseline_stats:
         return {
-            'psi': 0.0,
             'ks_statistic': 0.0,
             'ks_pvalue': 1.0,
             'drift_detected': False,
-            'threshold_psi': DRIFT_PSI_THRESHOLD,
             'threshold_ks': DRIFT_KS_PVALUE_THRESHOLD,
         }
     
@@ -321,42 +258,30 @@ def check_class_distribution_drift(
     
     if current_total == 0:
         return {
-            'psi': 0.0,
             'ks_statistic': 0.0,
             'ks_pvalue': 1.0,
             'drift_detected': False,
-            'threshold_psi': DRIFT_PSI_THRESHOLD,
             'threshold_ks': DRIFT_KS_PVALUE_THRESHOLD,
         }
     
     # Calculate distributions
     baseline_prop_0 = baseline['class_0_count'] / baseline_total
     baseline_prop_1 = baseline['class_1_count'] / baseline_total
-    current_prop_0 = predictions.count(0) / current_total
-    current_prop_1 = predictions.count(1) / current_total
     
     baseline_dist = np.array([baseline_prop_0, baseline_prop_1])
-    current_dist = np.array([current_prop_0, current_prop_1])
-    
-    # Calculate PSI
-    psi = calculate_psi(current_dist, baseline_dist, bins=2)
     
     # Calculate KS test
     baseline_samples = np.random.choice([0, 1], size=baseline_total, p=baseline_dist)
-    current_samples = predictions
-    ks_statistic, ks_pvalue = ks_2samp(baseline_samples, current_samples)
+    ks_statistic, ks_pvalue = ks_2samp(baseline_samples, predictions)
     
     # Check drift thresholds
-    psi_drift = psi > DRIFT_PSI_THRESHOLD
     ks_drift = ks_pvalue < DRIFT_KS_PVALUE_THRESHOLD
-    drift_detected = psi_drift or ks_drift
+    drift_detected = bool(ks_drift)
     
     return {
-        'psi': psi,
         'ks_statistic': float(ks_statistic),
         'ks_pvalue': float(ks_pvalue),
         'drift_detected': drift_detected,
-        'threshold_psi': DRIFT_PSI_THRESHOLD,
         'threshold_ks': DRIFT_KS_PVALUE_THRESHOLD,
     }
 
@@ -378,29 +303,10 @@ def get_model_run_id(model_name: str = MODEL_NAME) -> Optional[str]:
     client = MlflowClient()
     
     try:
-        # Get latest model version
-        model = client.get_registered_model(model_name)
-        if model and model.latest_versions:
-            latest_version = model.latest_versions[0]
-            # Extract run ID from source (format: s3://... or file://...)
-            source = latest_version.source
-            # Try different formats
-            if 'runs:' in source:
-                # Format: runs:/<run_id>/model
-                return source.split('/')[1]
-            elif 'file:' in source:
-                # Format: file:///path/to/mlruns/<experiment_id>/<run_id>/artifacts/model
-                parts = source.split('/')
-                # Find the run_id (32 char hex string)
-                for part in parts:
-                    if len(part) == 32 and all(c in '0123456789abcdef' for c in part):
-                        return part
-            else:
-                # Try splitting by / and getting the first 32-char part
-                parts = source.split('/')
-                for part in parts:
-                    if len(part) == 32:
-                        return part
+        versions = client.search_model_versions(f"name='{model_name}'")
+        if versions:
+            latest = max(versions, key=lambda v: int(v.version))
+            return latest.run_id
     except Exception as e:
         print(f"Warning: Could not get model run ID: {e}")
     
@@ -409,7 +315,7 @@ def get_model_run_id(model_name: str = MODEL_NAME) -> Optional[str]:
 
 def get_latest_run_id() -> Optional[str]:
     """
-    Get the latest MLflow run ID from the default experiment.
+    Get the run ID of the latest run in the training experiment.
     
     Returns
     -------
@@ -420,13 +326,11 @@ def get_latest_run_id() -> Optional[str]:
     client = MlflowClient()
     
     try:
-        # Get the default or current experiment
-        experiment = mlflow.get_experiment_by_name("Default")
+        # Get the project's training experiment
+        experiment = mlflow.get_experiment_by_name(EXPERIMENT_NAME)
+
         if experiment is None:
-            experiment = mlflow.get_experiment_by_name(mlflow.get_experiment().name)
-        
-        if experiment is None:
-            print("Warning: No experiment found")
+            print(f"Warning: Experiment {EXPERIMENT_NAME} not found")
             return None
         
         experiment_id = experiment.experiment_id
@@ -549,7 +453,6 @@ def log_metrics_to_mlflow(
     # Log confidence drift metrics
     if drift_results.get('confidence_drift'):
         cd = drift_results['confidence_drift']
-        client.log_metric(run_id, "drift.confidence.psi", cd.get('psi', 0.0))
         client.log_metric(run_id, "drift.confidence.ks_statistic", cd.get('ks_statistic', 0.0))
         client.log_metric(run_id, "drift.confidence.ks_pvalue", cd.get('ks_pvalue', 1.0))
         client.log_metric(run_id, "drift.confidence.mean_diff", cd.get('mean_diff', 0.0))
@@ -560,7 +463,6 @@ def log_metrics_to_mlflow(
     # Log class distribution drift metrics
     if drift_results.get('class_distribution_drift'):
         cdd = drift_results['class_distribution_drift']
-        client.log_metric(run_id, "drift.class.psi", cdd.get('psi', 0.0))
         client.log_metric(run_id, "drift.class.ks_statistic", cdd.get('ks_statistic', 0.0))
         client.log_metric(run_id, "drift.class.ks_pvalue", cdd.get('ks_pvalue', 1.0))
         client.log_metric(run_id, "drift.class.detected", int(cdd.get('drift_detected', False)))
@@ -608,7 +510,6 @@ def print_drift_results(drift_results: Dict[str, Any], days: int = DRIFT_DEFAULT
     if drift_results.get('confidence_drift'):
         cd = drift_results['confidence_drift']
         print(f"\n--- Confidence Drift ---")
-        print(f"PSI: {cd.get('psi', 0.0):.4f} (threshold: {cd.get('threshold_psi', DRIFT_PSI_THRESHOLD)})")
         print(f"KS statistic: {cd.get('ks_statistic', 0.0):.4f}, p-value: {cd.get('ks_pvalue', 1.0):.6f} (threshold: {cd.get('threshold_ks', DRIFT_KS_PVALUE_THRESHOLD)})")
         print(f"Mean difference: {cd.get('mean_diff', 0.0):.4f} (threshold: 0.1)")
         print(f"Current mean: {cd.get('current_mean', 0.0):.4f}, Baseline mean: {cd.get('baseline_mean', 0.0):.4f}")
@@ -618,7 +519,6 @@ def print_drift_results(drift_results: Dict[str, Any], days: int = DRIFT_DEFAULT
     if drift_results.get('class_distribution_drift'):
         cdd = drift_results['class_distribution_drift']
         print(f"\n--- Class Distribution Drift ---")
-        print(f"PSI: {cdd.get('psi', 0.0):.4f} (threshold: {cdd.get('threshold_psi', DRIFT_PSI_THRESHOLD)})")
         print(f"KS statistic: {cdd.get('ks_statistic', 0.0):.4f}, p-value: {cdd.get('ks_pvalue', 1.0):.6f} (threshold: {cdd.get('threshold_ks', DRIFT_KS_PVALUE_THRESHOLD)})")
         print(f"Drift detected: {cdd.get('drift_detected', False)}")
     
@@ -688,7 +588,13 @@ def main():
     # Load baseline stats
     if args.baseline_path:
         baseline_path = Path(args.baseline_path)
-        baseline_stats = load_baseline_stats() if baseline_path.exists() else None
+        if baseline_path.exists():
+            with open(baseline_path, 'r') as f:
+                baseline_stats = json.load(f)
+            print(f"Loaded baseline stats from {baseline_path}")
+        else:
+            print(f"Warning: Baseline stats not found at {baseline_path}")
+            baseline_stats = None
     else:
         baseline_stats = load_baseline_stats()
     
