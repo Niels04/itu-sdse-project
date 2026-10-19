@@ -1,27 +1,42 @@
+# The name of the app on DigitalOcean (appears in the deployed URL) and the
+# data-center region it runs in.
 name: mlops-itu-jtk
 region: fra1
 
-# Deploys the pre-built serving image from the GitHub Container Registry
-# (ghcr.io). The GitHub Actions workflow builds and pushes it; App Platform
-# never builds from the repository, so the model and MLflow state never enter
-# git. GHCR public packages are free; App Platform pulls them without
-# credentials, so the package must be made public once after the first push
-# (package settings -> Change visibility). Note that public means the model
-# is publicly downloadable.
+# This file is an "app spec": a recipe that tells DigitalOcean's App Platform
+# (a service that runs Docker containers for you) what to run. It deploys the
+# model-serving Docker image from the GitHub Container Registry (ghcr.io - the
+# place GitHub hosts Docker images). Your pipeline builds and pushes that
+# image; App Platform only downloads and runs it, it never looks at your git
+# repository. That is why the model never enters git.
 #
-# There is no deployed MLflow tracking server: best-model selection happens
-# at training time in CI (the train job logs to the local SQLite state
-# carried in workflow artifacts), and serving does not need one -
-# inference logging goes to a local file in the container and is discarded.
+# One-time setup: GHCR packages are free while public. After your pipeline
+# pushes the image for the first time, open the package on GitHub
+# (Package settings -> Change visibility) and make it public, so App Platform
+# can pull it without a login. Be aware: public means anyone can download your
+# model image.
 #
-# Top-level ingress rules instead of per-service routes: routes strip the
-# matched path prefix before forwarding, so /invocations would reach the
-# scoring server as "/" and 404. preserve_path_prefix forwards the original
-# path unchanged.
+# There is no MLflow tracking server in production. The best model is picked
+# during training in CI; the serving container does not need MLflow at all -
+# it just answers prediction requests and writes its inference log to a file
+# inside the container that is thrown away on every redeploy.
 #
-# __OWNER__ and __TAG__ are rendered by the workflow (lowercased owner and
-# the deploying commit SHA; scripts/deploy_do_app.sh renders them to
-# literals for manual use).
+# The two placeholders below are the parts YOU must fill in from your
+# pipeline before handing this spec to DigitalOcean:
+#   __OWNER__  your GitHub username or organization, lowercased, e.g. the
+#              "my-team" in ghcr.io/my-team/model-serve
+#   __TAG__    the exact image tag your pipeline pushed to ghcr.io, e.g. the
+#              commit SHA you built the image from
+# If these do not match the image you actually pushed, the deploy fails with
+# a "pull image" error.
+# The ingress rules route traffic from the public URL to your container.
+# Each rule says: requests whose path starts with this prefix go to that
+# service, with preserve_path_prefix keeping the full path intact.
+# (Without preserve_path_prefix the prefix would be stripped before
+# forwarding, so /invocations would arrive at the server as "/" and 404.)
+# These prefixes must match the endpoints your serving code actually
+# serves (/invocations, /infer, /health, /drift); the service names must
+# match the service name below.
 ingress:
   rules:
     - component:
@@ -50,16 +65,26 @@ ingress:
           prefix: /drift
 
 services:
+  # One service: the model-serving container. "model-serve" here is the name
+  # the ingress rules above point at - change it in both places or not at all.
   - name: model-serve
     image:
+      # Where to download the image from. "repository" must be the full
+      # ghcr.io path you pushed to (owner/image), with __OWNER__ filled in.
       registry_type: GHCR
       registry: ghcr.io
       repository: __OWNER__/model-serve
+      # Must be the exact tag your pipeline pushed (see __TAG__ above).
       tag: __TAG__
+    # The size of the virtual machine running the container.
     instance_size_slug: apps-s-1vcpu-1gb-fixed
+    # Must match the port your serving server listens on (uvicorn on 5001).
     http_port: 5001
     health_check:
+      # App Platform repeatedly requests this path and restarts the app if it
+      # fails. It must be an endpoint the server actually serves (/health).
       http_path: /health
+      # Wait this long after startup before checking (model loading is slow).
       initial_delay_seconds: 90
       period_seconds: 10
       timeout_seconds: 10
