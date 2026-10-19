@@ -66,33 +66,42 @@ data/
 ├── Plastic/
 │   └── ... (144 plastic impurity vials)
 ├── Rubber/
-│   └── ... (146 rubber impurity vials)
+│   └── ... (145 rubber impurity vials)
 └── Sand/
-    └── ... (143 sand impurity vials)
+    └── ... (144 sand impurity vials)
 ```
 
 ### **Organized Dataset Structure (Processed)**
 ```bash
-data/images/
-├── raw/
-│   ├── Clean_001.jpg
-│   ├── Clean_002.jpg
-│   ├── ...
-│   ├── Glass_001.jpg
-│   ├── Glass_002.jpg
-│   └── ... (730 total images)
-└── metadata.csv
+data/
+├── images/
+│   ├── raw/
+│   │   ├── Clean_001.jpg
+│   │   ├── Clean_002.jpg
+│   │   ├── ...
+│   │   ├── Glass_001.jpg
+│   │   ├── Glass_002.jpg
+│   │   └── ... (one image per vial)
+│   └── metadata.csv
+└── test/                     <- held-out test set (see below)
+    ├── Clean_151_TLC00-20240326150919-041901.jpg
+    ├── ... (2 per class)
+    └── metadata.csv
 ```
+
+### **Held-Out Test Set**
+A small held-out test set lives at `data/test/`: **10 images, 2 per class** (clean, glass, plastic, rubber, sand), with `batch_id=TEST_SET` in its metadata. It is separate from the training images and is used to check predictions against the deployed model without touching the training data. Its metadata uses the same schema as the training metadata, but filenames include the full camera file name (e.g. `Clean_151_TLC00-20240326150919-041901.jpg`).
 
 ---
 
 ## **Dataset Statistics**
 
 ### **Overall Statistics**
-- **Total Raw Images**: 13,880 (19 images per vial × 730 vials)
+- **Total Raw Images**: 13,870 (19 images per vial)
 - **Total Vials**: 730
-- **Total Processed Images**: 730 (1 representative image per vial)
-- **Image Dimensions**: 1600×768 pixels (native), resized to 64×64 for model input
+- **Total Processed Images**: 730 (1 image per vial)
+- **Held-Out Test Images**: 10 (2 per class, kept separate from the training set)
+- **Image Dimensions**: 1600×768 pixels (native; stored images are not resized)
 - **File Format**: JPEG
 - **Color Channels**: RGB (3 channels)
 - **File Size Range**: ~500KB - 1MB per image
@@ -104,8 +113,8 @@ data/images/
 | 0 | Clean | 153 | 20.96% | 0 | clean |
 | 1 | Glass | 144 | 19.73% | 1 | defective |
 | 1 | Plastic | 144 | 19.73% | 1 | defective |
-| 1 | Rubber | 146 | 20.00% | 1 | defective |
-| 1 | Sand | 143 | 19.59% | 1 | defective |
+| 1 | Rubber | 145 | 19.86% | 1 | defective |
+| 1 | Sand | 144 | 19.73% | 1 | defective |
 | **Total** | **-** | **730** | **100%** | **-** | **-** |
 
 **Binary Classification Distribution:**
@@ -115,8 +124,8 @@ data/images/
 ### **Impurity Type Distribution**
 - **Glass Particles**: 144 vials (19.73%)
 - **Plastic Particles**: 144 vials (19.73%)
-- **Rubber Particles**: 146 vials (20.00%)
-- **Sand Particles**: 143 vials (19.59%)
+- **Rubber Particles**: 145 vials (19.86%)
+- **Sand Particles**: 144 vials (19.73%)
 - **Clean (No Impurities)**: 153 vials (20.96%)
 
 ---
@@ -165,7 +174,6 @@ data/images/
 ### **Size and Resolution**
 - **Original Resolution**: 1600×768 pixels
 - **Aspect Ratio**: ~2.08:1 (landscape orientation)
-- **Model Input Resolution**: 64×64 pixels (resized with aspect ratio preservation)
 - **File Size**: ~500KB - 1MB per JPEG image
 
 ---
@@ -181,32 +189,23 @@ The `metadata.csv` file contains the following columns:
 | `class_name` | string | Human-readable class name | "clean" |
 | `vial_id` | string | Original vial identifier | "Clean_001" |
 | `impurity_type` | string | Type of impurity or "none" | "none", "glass", "plastic", "rubber", "sand" |
-| `original_path` | string | Path to original image in raw dataset | "data/Clean/Clean_001/TLC00-20240326154141-058901.jpg" |
+| `original_path` | string | Path to original image in raw dataset | "data/Clean/Clean_001/TLC00-20240326154142-058909.jpg" |
 | `num_images_in_series` | integer | Number of images in original rotation series | 19 |
 | `width` | integer | Original image width in pixels | 1600 |
 | `height` | integer | Original image height in pixels | 768 |
 | `format` | string | Image file format | "JPEG" |
-| `batch_id` | string | Batch identifier for tracking | "BATCH_2024_ICPR" |
-| `timestamp` | datetime | When the image was processed | "2026-07-23T10:26:10.757295" |
+| `batch_id` | string | Batch identifier for tracking | "BATCH_2024_ICPR" (training), "TEST_SET" (held-out test) |
+| `timestamp` | datetime | When the image was processed | "2026-07-23T13:03:11.963263" |
 
 ---
 
 ## **Data Preparation**
 
 ### **Image Selection**
-From the original dataset with 19 rotated images per vial, we selected **1 representative image per vial** to create a manageable dataset. The selection criteria:
+From the original dataset with 19 rotated images per vial, we keep **1 image per vial** to create a manageable dataset. The chosen image varies per vial - it is not always the first of the rotation series; any of the 19 views serves as a representative.
 
-1. **First Image**: For simplicity, we selected the first image in each vial directory
-2. **Alternative**: Could select the middle image (index 9 or 10) for most representative view
-3. **Future Enhancement**: Could use all 19 images for more robust training
-
-### **Resizing Strategy**
-The high-resolution images (1600×768) are resized to 64×64 for model input:
-
-- **Method**: Bilinear interpolation (default in PyTorch transforms)
-- **Aspect Ratio**: Preserved during resizing
-- **Reason**: 224×224 provides good balance between computational efficiency and feature preservation
-- **Normalization**: ImageNet statistics (mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+### **Preprocessing**
+The fetched images are stored exactly as they come from the raw dataset - native 1600×768 resolution, no resizing or other processing is applied to the files. Anything done to the images at training time happens in the notebooks, not in the dataset.
 
 ### **Stratification**
 The dataset maintains the natural class distribution:
@@ -239,35 +238,6 @@ All images in the organized dataset have been validated for:
 
 4. **Impurity Visibility**: Some impurities may be subtle and difficult to detect, even for human inspectors.
 
----
-
-## **Usage Guidelines**
-
-### **For Model Training**
-```python
-# Example usage with PyTorch
-from torchvision import transforms
-from PIL import Image
-
-# Define transforms
-transform = transforms.Compose([
-    transforms.Resize((64, 64)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], 
-                         std=[0.229, 0.224, 0.225])
-])
-
-# Load and transform image
-image = Image.open("data/images/raw/Clean_001.jpg")
-image_tensor = transform(image)
-```
-
-### **For Data Loading**
-```python
-# Use the metadata directly
-import pandas as pd
-metadata = pd.read_csv("data/images/metadata.csv")
-```
 
 ---
 
@@ -286,21 +256,29 @@ The dataset was organized in a one-off step, which:
 - Metadata file at `data/images/metadata.csv`
 - Dataset statistics printed to console
 
+### **Where the data lives now**
+Both the organized set and the held-out test set are hosted in the course object store (`data` bucket at `itudsip.hel1.your-objectstorage.com`, keys `images/raw/`, `images/metadata.csv`, `test/`, `test/metadata.csv`). The training notebook downloads them from there; the raw 19-image tree is not distributed with the repository. The two metadata CSVs are versioned with DVC (`data/images/metadata.csv.dvc`, `data/test/metadata.csv.dvc`), so `dvc pull` fetches them from the object store, while the JPEG images themselves are downloaded by the notebook from the URLs listed in the metadata.
+
 ---
 
 ## **File Manifest**
 
 ### **Raw Dataset Files**
-- **Location**: `data/{Clean,Glass,Plastic,Rubber,Sand}/`
+- **Location**: `data/{Clean,Glass,Plastic,Rubber,Sand}/` (source dataset only, not distributed with the repository)
 - **Total Directories**: 5 (categories) + 730 (vials)
-- **Total Images**: 13,880 JPEG files
+- **Total Images**: 13,870 JPEG files
 - **Total Size**: ~4.5 GB (estimated)
 
 ### **Processed Dataset Files**
-- **Location**: `data/images/raw/`
+- **Location**: object store `images/raw/` (downloaded by the training notebook to `data/images/raw/`)
 - **Total Images**: 730 JPEG files
-- **Metadata**: `data/images/metadata.csv`
+- **Metadata**: object store `images/metadata.csv`
 - **Total Size**: ~730 MB (estimated)
+
+### **Held-Out Test Set Files**
+- **Location**: object store `test/` (downloaded to `data/test/`)
+- **Total Images**: 10 JPEG files
+- **Metadata**: object store `test/metadata.csv`
 
 ---
 
@@ -348,6 +326,7 @@ For questions about this specific implementation and organization, please refer 
 | 2026-07-23 | Initial dataset organization and documentation | Jeppe Kristensen |
 | 2026-07-23 | Created metadata.csv with vial information | Jeppe Kristensen |
 | 2026-07-23 | Extracted 1 representative image per vial (730 total) | Jeppe Kristensen |
+| 2026-10-19 | Verified counts against object-store metadata; documented held-out test set and object-store location; removed training-time preprocessing (kept in notebooks) | Jeppe Kristensen |
 
 ---
 
@@ -355,14 +334,17 @@ For questions about this specific implementation and organization, please refer 
 
 ```csv
 filename,class,class_name,vial_id,impurity_type,original_path,num_images_in_series,width,height,format,batch_id,timestamp
-Clean_001.jpg,0,clean,Clean_001,none,data/Clean/Clean_001/TLC00-20240326154141-058901.jpg,19,1600,768,JPEG,BATCH_2024_ICPR,2026-07-23T10:26:10.757295
-Clean_002.jpg,0,clean,Clean_002,none,data/Clean/Clean_002/TLC00-20240326154142-058906.jpg,19,1600,768,JPEG,BATCH_2024_ICPR,2026-07-23T10:26:10.760899
-Glass_001.jpg,1,defective,Glass_001,glass,data/Glass/Glass_001/TLC00-20240326144241-037301.jpg,19,1600,768,JPEG,BATCH_2024_ICPR,2026-07-23T10:26:10.764969
-Plastic_001.jpg,1,defective,Plastic_001,plastic,data/Plastic/Plastic_001/TLC00-20240326150921-058913.jpg,19,1600,768,JPEG,BATCH_2024_ICPR,2026-07-23T10:26:10.768107
-Rubber_001.jpg,1,defective,Rubber_001,rubber,data/Rubber/Rubber_001/TLC00-20240326151432-059001.jpg,19,1600,768,JPEG,BATCH_2024_ICPR,2026-07-23T10:26:10.771234
-Sand_001.jpg,1,defective,Sand_001,sand,data/Sand/Sand_001/TLC00-20240326151943-059101.jpg,19,1600,768,JPEG,BATCH_2024_ICPR,2026-07-23T10:26:10.774567
+Clean_001.jpg,0,clean,Clean_001,none,data/Clean/Clean_001/TLC00-20240326154142-058909.jpg,19,1600,768,JPEG,BATCH_2024_ICPR,2026-07-23T13:03:11.963263
+Glass_001.jpg,1,defective,Glass_001,glass,data/Glass/Glass_001/TLC00-20240327112026-064005.jpg,19,1600,768,JPEG,BATCH_2024_ICPR,2026-07-23T13:03:12.317892
+Plastic_001.jpg,1,defective,Plastic_001,plastic,data/Plastic/Plastic_001/TLC00-20240326165823-075117.jpg,19,1600,768,JPEG,BATCH_2024_ICPR,2026-07-23T13:03:13.105708
+Rubber_001.jpg,1,defective,Rubber_001,rubber,data/Rubber/Rubber_001/TLC00-20240325171030-072108.jpg,19,1600,768,JPEG,BATCH_2024_ICPR,2026-07-23T13:03:13.508619
+Sand_001.jpg,1,defective,Sand_001,sand,data/Sand/Sand_001/TLC00-20240326094240-016412.jpg,19,1600,768,JPEG,BATCH_2024_ICPR,2026-07-23T13:03:13.600618
+Clean_151_TLC00-20240326150919-041901.jpg,0,clean,Clean_151,none,data/Clean/Clean_151/TLC00-20240326150919-041901.jpg,19,1600,768,JPEG,TEST_SET,2026-07-29T19:11:01.414901
+Glass_039_TLC00-20240327111626-061101.jpg,1,defective,Glass_039,glass,data/Glass/Glass_039/TLC00-20240327111626-061101.jpg,19,1600,768,JPEG,TEST_SET,2026-07-29T19:11:01.415854
 ```
+
+The last two rows are from the held-out test set (`data/test/metadata.csv`); the rest are from the training metadata (`data/images/metadata.csv`).
 
 ---
 
-*Last updated: 2026-07-23*
+*Last updated: 2026-10-19*
