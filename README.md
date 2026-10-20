@@ -1,8 +1,8 @@
-# ITU BDS MLOPS'25 - Project
+# ITU BDS MLOPS'26 - Project (V2)
 
 ## Task
 
-Based on the input provided (see below), fork the repository and restructure the code to adhere to the concepts and ideas you have seen throughout the course.  The diagram below provides a detailed overview of the structure that the solution is expected to follow.   
+Based on the input provided (see below), fork the repository and restructure the code to adhere to the concepts and ideas you have seen throughout the course. The diagram below provides a detailed overview of the structure that the solution is expected to follow.
 
 ![Project architecture](./docs/project-architecture.png)
 
@@ -18,13 +18,13 @@ The repository linked in the submission should contain:
 - Dagger workflow (in Go)
 - All history
 
-
 ## Inputs
 
 You are given the following material:
-- Python monolith (see `notebooks` folder)
-- Raw input data (see `notebooks/artifacts` folder)
-- GitHub action to test model inference (see [`model-validator`](https://github.com/lasselundstenjensen/itu-sdse-project-model-validator) action)
+- Python monoliths (see `notebooks` folder)
+- Raw input data (pulled from the object store by the training notebook)
+- Group login to https://sdse-event-engine-r5ih8.ondigitalocean.app/ for monitoring deployed model
+- DigitalOcean App Platform spec for the deployment (see `infra/digitalocean/app.yaml`)
 
 ## Outputs
 
@@ -32,7 +32,11 @@ You are given the following material:
   - A README.md file that describes the project
   - GitHub automation workflow
   - Dagger workflow (in Go)
-- Model artifact produced by GitHub workflow and named 'model'
+- Model artifacts produced by GitHub workflow
+- Hosted endpoint in DigitalOcean
+  - /health that returns {"status": "ok"}
+  - /invocations that take binary image payload
+  - /drift that returns model/data drift information
 
 > **NOTE:**
 > The Dagger workflow can be run locally or inside the GitHub workflow—both are viable options during development.
@@ -43,35 +47,33 @@ You are given the following material:
 >
 > This model artifact can then be picked up by the [action provided](https://github.com/lasselundstenjensen/itu-sdse-project-model-validator), which will run some inference tests to ensure that the correct model was trained.
 
-
 ## How will we assess
 
-Below, we provide information on how we will assess the submission clustered around several aspects.  The list relates to groups of size 3; if your group is of size 4, you are expected also to work on the optional items, i.e., to use pull requests and to provide tests.
+Below, we provide information on how we will assess the submission clustered around several aspects. The groups are expected to be of size 4, and you're expected to use pull requests and tests.
 
-#### Versioning
+### Versioning
 
 - Use of Git (semantic commit messages, branches, branch longevity, commit frequency/size)
-- Management of data
-- Use of pull requests (OPTIONAL)
+- Management of data and artifacts
+- Use of pull requests
 
-#### Programming
+### Programming
 
 - Decomposition of Python notebook
 - Adherance to standard data science MLOps project structure
-- Presence of tests (OPTIONAL)
+- Presence of tests
 
-#### Workflow automation
+### Workflow automation
 
 - Presence of a workflow that trains the model
 - Presence of a workflow that tests the model
 - Structure of Dagger workflow
 - Orchestration of Dagger workflow through GitHub workflow
 
-#### Documentation (README.md)
+### Documentation (README.md)
 
 - Description of project structure
 - How to run the code and generate the model artifact
-
 
 ## Questions
 
