@@ -51,12 +51,6 @@ import os
 import shutil
 import subprocess
 
-os.makedirs("artifacts", exist_ok=True)
-os.makedirs("mlflow-state", exist_ok=True)
-os.makedirs("mlflow-state/artifacts", exist_ok=True)
-os.makedirs("data/images/raw", exist_ok=True)
-print("Created artifacts directory")
-
    
 # # Pandas dataframe print options
 
@@ -90,8 +84,7 @@ def setup_mlflow_tracking(experiment_name=None):
         mlflow.create_experiment(experiment_name, artifact_location=mlflow_artifact_location)
     mlflow.set_experiment(experiment_name)
 
-setup_mlflow_tracking(experiment_name)
-print("MLflow tracking URI:", mlflow.get_tracking_uri())
+
 
    
 # # READ DATA
@@ -191,10 +184,6 @@ def pull_data_from_dvc():
     download_files_from_metadata("data/images/metadata.csv", "data/images/raw", "images/raw/")
     download_files_from_metadata("data/test/metadata.csv", "data/test", "test/")
 
-# The metadata csvs are tracked with DVC (see data/images/metadata.csv.dvc and
-# data/test/metadata.csv.dvc), so dvc pull fetches them before we download the images.
-subprocess.run(["dvc", "pull"], check=True) # replaces ! dvc pull
-pull_data_from_dvc()
 
 
    
@@ -231,8 +220,7 @@ def load_image_dataset():
 
     return image_dataset
 
-image_dataset = load_image_dataset()
-print(pd.read_csv(metadata_path).head(5)) #changed from display to print
+
 
    
 # # Exploratory analysis
@@ -244,15 +232,7 @@ def count_classes(labels):
     unique, counts = np.unique(labels, return_counts=True)
     return dict(zip(unique, counts))
 
-labels = [label for _, label in image_dataset]
-class_dist = count_classes(labels)
-print("Class distribution:")
-for cls, count in class_dist.items():
-    print(f"  Class {cls}: {count} images ({count/len(labels)*100:.1f}%)")
 
-metadata_df = pd.read_csv(metadata_path)
-print("\nImages per class name:")
-print(metadata_df["class_name"].value_counts())
 
    
 # # Helper functions
@@ -306,10 +286,7 @@ def calculate_image_statistics(data_loader):
  
 import json
 
-class_names = {0: "good", 1: "defective"}
-with open(class_names_path, "w") as f:
-    json.dump(class_names, f, indent=2)
-print(f"Class names saved to {class_names_path}")
+
 
    
 # # DATA PREPROCESSING
@@ -344,7 +321,7 @@ def define_transforms():
     print("Validation transforms: Resize, ToTensor, Normalize")
     return train_transforms, val_transforms
 
-train_transforms, val_transforms = define_transforms()
+
 
  
 from torch.utils.data import DataLoader, Dataset
@@ -449,14 +426,6 @@ def create_dataloaders(train_dataset, val_dataset, test_dataset, batch_size=batc
 
     return train_loader, val_loader, test_loader
 
-train_dataset, val_dataset, test_dataset = split_dataset(image_dataset)
-train_loader, val_loader, test_loader = create_dataloaders(train_dataset, val_dataset, test_dataset)
-
-# Save the image statistics of the training set as an artifact
-image_stats = calculate_image_statistics(train_loader)
-with open(image_statistics_path, "w") as f:
-    json.dump(image_stats, f, indent=2)
-print(f"Image statistics saved to {image_statistics_path}")
 
    
 # # MODEL TRAINING
@@ -816,46 +785,6 @@ def tune_threshold(model, val_loader, device=device, threshold_range=None):
 # Everything from here on logs to a single MLflow run.
 
  
-print_section_header("CNN MODEL TRAINING")
-
-torch.manual_seed(random_state)
-np.random.seed(random_state)
-
-if mlflow.active_run():
-    mlflow.end_run()
-    print("Ended previous active MLflow run")
-
-run = mlflow.start_run(run_name="training_notebook")
-
-# Log parameters to MLflow
-mlflow.log_param("model_architecture", "SimpleCNN")
-mlflow.log_param("batch_size", batch_size)
-mlflow.log_param("num_epochs", num_epochs)
-mlflow.log_param("learning_rate", learning_rate)
-mlflow.log_param("initial_threshold", threshold)
-mlflow.log_param("num_classes", num_classes)
-mlflow.log_param("image_size", "64x64")
-mlflow.log_param("random_seed", random_state)
-
-# Log model architecture details
-model_params = sum(p.numel() for p in SimpleCNN().parameters())
-trainable_params = sum(p.numel() for p in SimpleCNN().parameters() if p.requires_grad)
-mlflow.log_param("total_parameters", model_params)
-mlflow.log_param("trainable_parameters", trainable_params)
-
-cnn_model, training_history = train_cnn_model(
-    train_loader, val_loader,
-    num_epochs=num_epochs,
-    learning_rate=learning_rate,
-    device=device,
-    random_seed=random_state,
-)
-
-# Tune threshold on validation set
-optimal_threshold = tune_threshold(cnn_model, val_loader, device=device)
-
-# Evaluate on test set with optimal threshold
-test_results = evaluate_cnn_model(cnn_model, test_loader, device=device, threshold=optimal_threshold)
 
    
 # # Drift baseline
@@ -981,24 +910,6 @@ def compute_baseline_statistics(model, data_loader, device=device, feature_layer
     finally:
         handle.remove()
 
-baseline_stats = compute_baseline_statistics(cnn_model, val_loader, threshold=optimal_threshold)
-
-with open(drift_baseline_stats_path, 'w') as f:
-    json.dump(baseline_stats, f, indent=2)
-print(f"Baseline statistics saved to {drift_baseline_stats_path}")
-
-# Log baseline statistics to MLflow
-mlflow.log_metric("baseline_image_mean_r", baseline_stats['image_statistics']['mean_r'])
-mlflow.log_metric("baseline_image_mean_g", baseline_stats['image_statistics']['mean_g'])
-mlflow.log_metric("baseline_image_mean_b", baseline_stats['image_statistics']['mean_b'])
-mlflow.log_metric("baseline_image_std_r", baseline_stats['image_statistics']['std_r'])
-mlflow.log_metric("baseline_image_std_g", baseline_stats['image_statistics']['std_g'])
-mlflow.log_metric("baseline_image_std_b", baseline_stats['image_statistics']['std_b'])
-mlflow.log_metric("baseline_class_0_count", baseline_stats['class_distribution']['class_0_count'])
-mlflow.log_metric("baseline_class_1_count", baseline_stats['class_distribution']['class_1_count'])
-mlflow.log_metric("baseline_confidence_mean", baseline_stats['confidence_statistics']['mean'])
-mlflow.log_metric("baseline_confidence_std", baseline_stats['confidence_statistics']['std'])
-mlflow.log_artifact(drift_baseline_stats_path, "drift_detection")
 
    
 # # Logging wrapper
@@ -1205,36 +1116,6 @@ class SimpleLoggingWrapper(mlflow.pyfunc.PythonModel):
 
 print("SimpleLoggingWrapper defined")
 
-   
-# # Save model artifacts
-# 
-# Saves the checkpoint and the results locally and logs the pyfunc model (wrapped with the optimal threshold from the tuning) as the model artifact of the run.
-
- 
-print("\nSaving model artifacts...")
-
-# Save model state dict
-torch.save({
-    'model_state_dict': cnn_model.state_dict(),
-    'architecture': SimpleCNN.__name__,
-    'input_shape': (3, 64, 64),
-    'output_shape': (1,),
-    'threshold': optimal_threshold,
-    'num_classes': num_classes,
-}, pytorch_model_path)
-print(f"CNN model saved to {pytorch_model_path}")
-
-# Save model results
-with open(model_results_path, "w") as results_file:
-    json.dump(test_results, results_file, indent=2)
-print(f"Model results saved to {model_results_path}")
-
-mlflow.log_param("classification_threshold", optimal_threshold)
-
-# Log the pyfunc model with the SimpleLoggingWrapper as the model artifact
-wrapper = SimpleLoggingWrapper(model=cnn_model)
-mlflow.pyfunc.log_model("model_pyfunc", python_model=wrapper)
-print("Logged pyfunc model to the MLflow run")
 
    
 # # MODEL REGISTRATION
@@ -1263,43 +1144,7 @@ def wait_until_ready(model_name, model_version, max_attempts=10):
     print(f"Model {model_name} version {model_version} did not become READY after {max_attempts} attempts")
     return False
 
-model_uri = f"runs:/{run.info.run_id}/model_pyfunc"
-model_details = mlflow.register_model(model_uri=model_uri, name=model_name)
-wait_until_ready(model_details.name, model_details.version)
 
-print(f"Model registered successfully:")
-print(f"  Name: {model_details.name}")
-print(f"  Version: {model_details.version}")
-print(f"  Stage: {model_details.current_stage}")
-
-# Transition to staging
-client = MlflowClient()
-client.transition_model_version_stage(
-    name=model_name,
-    version=model_details.version,
-    stage="Staging",
-    archive_existing_versions=True,
-)
-client.set_model_version_tag(model_name, model_details.version, "deployed_to", "staging")
-client.set_model_version_tag(model_name, model_details.version, "task", "classification")
-client.set_registered_model_alias(name=model_name, alias="best", version=str(model_details.version))
-
-print(f"Successfully transitioned {model_name} version {model_details.version} to Staging")
-pprint(dict(model_details))
-
- 
-mlflow.end_run()
-
-print("\n" + "=" * 50)
-print("TRAINING JOB COMPLETE")
-print("=" * 50)
-print("\nSummary:")
-print(f"  Training samples: {len(train_loader.dataset)}")
-print(f"  Validation samples: {len(val_loader.dataset)}")
-print(f"  Test samples: {len(test_loader.dataset)}")
-print(f"  Optimal threshold: {optimal_threshold:.4f}")
-print(f"  Test F1-score: {test_results['f1_score']:.4f}")
-print(f"  Registered model: {model_name} version {model_details.version} (Staging)")
 
    
 # # Done
@@ -1312,4 +1157,188 @@ print(f"  Registered model: {model_name} version {model_details.version} (Stagin
 # 
 # Open `02_deployment.ipynb` to select the best model, promote it to production and serve it.
 
+if __name__ == "__main__":
+    os.makedirs("artifacts", exist_ok=True)
+    os.makedirs("mlflow-state", exist_ok=True)
+    os.makedirs("mlflow-state/artifacts", exist_ok=True)
+    os.makedirs("data/images/raw", exist_ok=True)
+    print("Created artifacts directory")
+
+
+    setup_mlflow_tracking(experiment_name)
+    print("MLflow tracking URI:", mlflow.get_tracking_uri())
+
+
+    # The metadata csvs are tracked with DVC (see data/images/metadata.csv.dvc and
+    # data/test/metadata.csv.dvc), so dvc pull fetches them before we download the images.
+    subprocess.run(["dvc", "pull"], check=True) # replaces ! dvc pull
+    pull_data_from_dvc()
+
+
+    image_dataset = load_image_dataset()
+    print(pd.read_csv(metadata_path).head(5)) #changed from display to print
+
+
+    labels = [label for _, label in image_dataset]
+    class_dist = count_classes(labels)
+    print("Class distribution:")
+    for cls, count in class_dist.items():
+        print(f"  Class {cls}: {count} images ({count/len(labels)*100:.1f}%)")
+
+    metadata_df = pd.read_csv(metadata_path)
+    print("\nImages per class name:")
+    print(metadata_df["class_name"].value_counts())
+
+    class_names = {0: "good", 1: "defective"}
+    with open(class_names_path, "w") as f:
+        json.dump(class_names, f, indent=2)
+    print(f"Class names saved to {class_names_path}")
+
+
+    train_transforms, val_transforms = define_transforms()
+
+
+    train_dataset, val_dataset, test_dataset = split_dataset(image_dataset)
+    train_loader, val_loader, test_loader = create_dataloaders(train_dataset, val_dataset, test_dataset)
+
+    # Save the image statistics of the training set as an artifact
+    image_stats = calculate_image_statistics(train_loader)
+    with open(image_statistics_path, "w") as f:
+        json.dump(image_stats, f, indent=2)
+    print(f"Image statistics saved to {image_statistics_path}")
+
+
+
+    print_section_header("CNN MODEL TRAINING")
+
+    torch.manual_seed(random_state)
+    np.random.seed(random_state)
+
+    if mlflow.active_run():
+        mlflow.end_run()
+        print("Ended previous active MLflow run")
+
+    run = mlflow.start_run(run_name="training_notebook")
+
+    # Log parameters to MLflow
+    mlflow.log_param("model_architecture", "SimpleCNN")
+    mlflow.log_param("batch_size", batch_size)
+    mlflow.log_param("num_epochs", num_epochs)
+    mlflow.log_param("learning_rate", learning_rate)
+    mlflow.log_param("initial_threshold", threshold)
+    mlflow.log_param("num_classes", num_classes)
+    mlflow.log_param("image_size", "64x64")
+    mlflow.log_param("random_seed", random_state)
+
+    # Log model architecture details
+    model_params = sum(p.numel() for p in SimpleCNN().parameters())
+    trainable_params = sum(p.numel() for p in SimpleCNN().parameters() if p.requires_grad)
+    mlflow.log_param("total_parameters", model_params)
+    mlflow.log_param("trainable_parameters", trainable_params)
+
+    cnn_model, training_history = train_cnn_model(
+        train_loader, val_loader,
+        num_epochs=num_epochs,
+        learning_rate=learning_rate,
+        device=device,
+        random_seed=random_state,
+    )
+
+    # Tune threshold on validation set
+    optimal_threshold = tune_threshold(cnn_model, val_loader, device=device)
+
+    # Evaluate on test set with optimal threshold
+    test_results = evaluate_cnn_model(cnn_model, test_loader, device=device, threshold=optimal_threshold)
+
+
+    baseline_stats = compute_baseline_statistics(cnn_model, val_loader, threshold=optimal_threshold)
+
+    with open(drift_baseline_stats_path, 'w') as f:
+        json.dump(baseline_stats, f, indent=2)
+    print(f"Baseline statistics saved to {drift_baseline_stats_path}")
+
+    # Log baseline statistics to MLflow
+    mlflow.log_metric("baseline_image_mean_r", baseline_stats['image_statistics']['mean_r'])
+    mlflow.log_metric("baseline_image_mean_g", baseline_stats['image_statistics']['mean_g'])
+    mlflow.log_metric("baseline_image_mean_b", baseline_stats['image_statistics']['mean_b'])
+    mlflow.log_metric("baseline_image_std_r", baseline_stats['image_statistics']['std_r'])
+    mlflow.log_metric("baseline_image_std_g", baseline_stats['image_statistics']['std_g'])
+    mlflow.log_metric("baseline_image_std_b", baseline_stats['image_statistics']['std_b'])
+    mlflow.log_metric("baseline_class_0_count", baseline_stats['class_distribution']['class_0_count'])
+    mlflow.log_metric("baseline_class_1_count", baseline_stats['class_distribution']['class_1_count'])
+    mlflow.log_metric("baseline_confidence_mean", baseline_stats['confidence_statistics']['mean'])
+    mlflow.log_metric("baseline_confidence_std", baseline_stats['confidence_statistics']['std'])
+    mlflow.log_artifact(drift_baseline_stats_path, "drift_detection")
+
+
+    
+    # # Save model artifacts
+    # 
+    # Saves the checkpoint and the results locally and logs the pyfunc model (wrapped with the optimal threshold from the tuning) as the model artifact of the run.
+
+    
+    print("\nSaving model artifacts...")
+
+    # Save model state dict
+    torch.save({
+        'model_state_dict': cnn_model.state_dict(),
+        'architecture': SimpleCNN.__name__,
+        'input_shape': (3, 64, 64),
+        'output_shape': (1,),
+        'threshold': optimal_threshold,
+        'num_classes': num_classes,
+    }, pytorch_model_path)
+    print(f"CNN model saved to {pytorch_model_path}")
+
+    # Save model results
+    with open(model_results_path, "w") as results_file:
+        json.dump(test_results, results_file, indent=2)
+    print(f"Model results saved to {model_results_path}")
+
+    mlflow.log_param("classification_threshold", optimal_threshold)
+
+    # Log the pyfunc model with the SimpleLoggingWrapper as the model artifact
+    wrapper = SimpleLoggingWrapper(model=cnn_model)
+    mlflow.pyfunc.log_model("model_pyfunc", python_model=wrapper)
+    print("Logged pyfunc model to the MLflow run")
+
+
+
+    model_uri = f"runs:/{run.info.run_id}/model_pyfunc"
+    model_details = mlflow.register_model(model_uri=model_uri, name=model_name)
+    wait_until_ready(model_details.name, model_details.version)
+
+    print(f"Model registered successfully:")
+    print(f"  Name: {model_details.name}")
+    print(f"  Version: {model_details.version}")
+    print(f"  Stage: {model_details.current_stage}")
+
+    # Transition to staging
+    client = MlflowClient()
+    client.transition_model_version_stage(
+        name=model_name,
+        version=model_details.version,
+        stage="Staging",
+        archive_existing_versions=True,
+    )
+    client.set_model_version_tag(model_name, model_details.version, "deployed_to", "staging")
+    client.set_model_version_tag(model_name, model_details.version, "task", "classification")
+    client.set_registered_model_alias(name=model_name, alias="best", version=str(model_details.version))
+
+    print(f"Successfully transitioned {model_name} version {model_details.version} to Staging")
+    pprint(dict(model_details))
+
+    
+    mlflow.end_run()
+
+    print("\n" + "=" * 50)
+    print("TRAINING JOB COMPLETE")
+    print("=" * 50)
+    print("\nSummary:")
+    print(f"  Training samples: {len(train_loader.dataset)}")
+    print(f"  Validation samples: {len(val_loader.dataset)}")
+    print(f"  Test samples: {len(test_loader.dataset)}")
+    print(f"  Optimal threshold: {optimal_threshold:.4f}")
+    print(f"  Test F1-score: {test_results['f1_score']:.4f}")
+    print(f"  Registered model: {model_name} version {model_details.version} (Staging)")
 
