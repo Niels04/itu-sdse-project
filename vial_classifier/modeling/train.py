@@ -1,39 +1,5 @@
-# %% [markdown]
-# # Vial image classification - training notebook
-# 
-# The following notebooks are a re-written and adapted example from an actual production model. The data and model are different, but the structure of the code with its many comments and dead ends are very close to the truth.
-# 
-# The overall purpose of the ML algorithm is to identify defective glass vials coming off the production line. This is done by taking images of the vials as input, and the target is whether the vial passed the manual quality inspection -- essentially a classification problem.
-# 
-# This notebook runs as a nightly job (on Databricks) and trains a CNN on the images collected from the line. It fetches the raw images, preprocesses them, trains the model and leaves the trained model artifacts and the run history in MLflow. The follow-up notebook `02_deployment.ipynb` then picks the best model, promotes it and serves it.
-# 
-# As you know, there are multiple steps in an ML pipeline, and it's not always they are neatly separated like this. For the exam project, they will not be, and that is part of the challenge for you. For production code, it should also not be Python notebooks since, as you may well see, it is difficult to work with and collaborate on them in an automated way.
-# 
-# There is a lot of "fluff" in such a notebook. This ranges from comments and markdown cells to commented out code and random print statements. That is not necessary in a properly managed project where you can use git to check the version history and pin versions.
-# 
-# What is important for you is the identify the entry points into the code and segment them out into easily understandable chunks. Additionally, you might want to follow some basic code standards, such as:
-# 
-# - Import only libraries in the beginning of the files
-# - Define functions in the top of the scripts, or if used multiple places, move into a util.py script or such
-# - Remove unused/commented out code
-# - Follow the [PEP 8](https://peps.python.org/pep-0008/) style guide (and others)
-# 
-# Another thing to note is that comments can be misleading. Even if the markdown cell or inline comments says it does _X_, don't be surprised if it actually does _Y_. Sometimes additional text can be a blessing, but it can also be a curse. Remember, though, that your task is to make sure the code runs as before after refactoring the notebook into other files, not update/improve the model or flow to reflect what the comments might say.
-# 
-# Run everything from the project root (the notebook moves to the root itself if you opened it from `notebooks/`).
-# 
-# ***
-
-# %% [markdown]
 # # CONFIGURATION
-# 
 # The job takes a few parameters. On Databricks these were widgets, here they are just hardcoded.
-
-# %%
-# dbutils.widgets.text("Training data max date", "2024-01-31")
-# dbutils.widgets.text("Num epochs", "5")
-# max_date = dbutils.widgets.get("Training data max date")
-# num_epochs = dbutils.widgets.get("Num epochs")
 
 max_date = "2024-01-31"
 min_date = "2024-01-01"
@@ -75,21 +41,15 @@ mlflow_artifact_location = "./mlflow-state/artifacts"
 
 print("Configuration loaded")
 
-# %% [markdown]
+   
 # # Create artifact directory
 # 
 # We want to create a directory for storing all the artifacts in the current directory. Users can load all the artifacts later for data cleaning pipelines and inferencing.
 
-# %%
+ 
 import os
 import shutil
-
-# shutil.rmtree("./artifacts", ignore_errors=True)
-
-# Jupyter starts us in notebooks/ when the notebook is opened from there -
-# everything below assumes we are running from the project root
-if os.path.basename(os.getcwd()) == "notebooks":
-    os.chdir("..")
+import subprocess
 
 os.makedirs("artifacts", exist_ok=True)
 os.makedirs("mlflow-state", exist_ok=True)
@@ -97,10 +57,10 @@ os.makedirs("mlflow-state/artifacts", exist_ok=True)
 os.makedirs("data/images/raw", exist_ok=True)
 print("Created artifacts directory")
 
-# %% [markdown]
+   
 # # Pandas dataframe print options
 
-# %%
+ 
 import pandas as pd
 import numpy as np
 import warnings
@@ -109,12 +69,12 @@ from pprint import pprint
 warnings.filterwarnings('ignore')
 pd.set_option('display.float_format', lambda x: "%.3f" % x)
 
-# %% [markdown]
+   
 # # MLflow setup
 # 
 # Everything MLflow-related (runs, metrics, the model registry) logs to the local state directory `mlflow-state/`: a SQLite database plus the artifacts. No MLflow server needs to be running.
 
-# %%
+ 
 import mlflow
 
 def setup_mlflow_tracking(experiment_name=None):
@@ -133,12 +93,12 @@ def setup_mlflow_tracking(experiment_name=None):
 setup_mlflow_tracking(experiment_name)
 print("MLflow tracking URI:", mlflow.get_tracking_uri())
 
-# %% [markdown]
+   
 # # READ DATA
 # 
 # We read the latest data from our data lake source. Here we load it locally after having pulled it from DVC.
 
-# %%
+ 
 import csv
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -191,7 +151,7 @@ def download_with_dvc(url, out_path):
     s3_client.download_file(S3_BUCKET, key, str(out_path))
     print(f"Downloaded {url} to {out_path}")
 
-# %%
+ 
 def download_files_from_metadata(metadata_path, output_dir, prefix=""):
     """Download all files listed in a metadata csv from the object store."""
     s3_client = _setup_s3_client()
@@ -233,16 +193,16 @@ def pull_data_from_dvc():
 
 # The metadata csvs are tracked with DVC (see data/images/metadata.csv.dvc and
 # data/test/metadata.csv.dvc), so dvc pull fetches them before we download the images.
-!dvc pull
+subprocess.run(["dvc", "pull"], check=True) # replaces ! dvc pull
 pull_data_from_dvc()
 
 
-# %% [markdown]
+   
 # # Load dataset
 # 
 # The metadata csv lists every image and its class label (0 = clean/good, 1 = defective).
 
-# %%
+ 
 def load_image_dataset():
     """Load (image_path, label) pairs from the raw images and the metadata."""
     print(f"Loading image dataset from {image_data_dir}")
@@ -272,14 +232,14 @@ def load_image_dataset():
     return image_dataset
 
 image_dataset = load_image_dataset()
-display(pd.read_csv(metadata_path).head(5))
+print(pd.read_csv(metadata_path).head(5)) #changed from display to print
 
-# %% [markdown]
+   
 # # Exploratory analysis
 # 
 # Before training we look at the class balance of the dataset, since a skewed class distribution affects both the loss weighting and the metrics we should trust.
 
-# %%
+ 
 def count_classes(labels):
     unique, counts = np.unique(labels, return_counts=True)
     return dict(zip(unique, counts))
@@ -294,13 +254,13 @@ metadata_df = pd.read_csv(metadata_path)
 print("\nImages per class name:")
 print(metadata_df["class_name"].value_counts())
 
-# %% [markdown]
+   
 # # Helper functions
 # 
 # * **print_section_header**: Pretty print a section header so the job log is readable.
 # * **calculate_image_statistics**: Mean/std per channel over a DataLoader, saved as an artifact later.
 
-# %%
+ 
 def print_section_header(title):
     print("\n" + "=" * 50)
     print(title)
@@ -338,12 +298,12 @@ def calculate_image_statistics(data_loader):
         "total_samples": total_samples,
     }
 
-# %% [markdown]
+   
 # # Feature artifacts
 # 
 # Small artifacts that describe the dataset. They get loaded together with the model later.
 
-# %%
+ 
 import json
 
 class_names = {0: "good", 1: "defective"}
@@ -351,12 +311,12 @@ with open(class_names_path, "w") as f:
     json.dump(class_names, f, indent=2)
 print(f"Class names saved to {class_names_path}")
 
-# %% [markdown]
+   
 # # DATA PREPROCESSING
 # 
 # The images come in at the native resolution of the camera (1600x768). We resize them to 64x64 for training speed, apply light augmentation on the training set only, and normalize with the ImageNet statistics. The dataset is split 70/15/15 with stratification so the class balance is the same in all three sets.
 
-# %%
+ 
 import torch
 from torchvision import transforms
 
@@ -386,7 +346,7 @@ def define_transforms():
 
 train_transforms, val_transforms = define_transforms()
 
-# %%
+ 
 from torch.utils.data import DataLoader, Dataset
 
 class GlassVialDataset(Dataset):
@@ -416,7 +376,7 @@ class GlassVialDataset(Dataset):
 
         return image, label
 
-# %%
+ 
 def split_dataset(image_dataset, train_ratio=0.70, val_ratio=0.15, test_ratio=0.15, random_seed=42):
     """Stratified split so both classes keep the same balance in every set."""
     print(f"\nSplitting dataset into train ({train_ratio}), val ({val_ratio}), test ({test_ratio})...")
@@ -465,7 +425,7 @@ def split_dataset(image_dataset, train_ratio=0.70, val_ratio=0.15, test_ratio=0.
 
     return train_dataset, val_dataset, test_dataset
 
-# %%
+ 
 def create_dataloaders(train_dataset, val_dataset, test_dataset, batch_size=batch_size):
     print(f"\nCreating DataLoaders with batch_size={batch_size}...")
 
@@ -498,14 +458,14 @@ with open(image_statistics_path, "w") as f:
     json.dump(image_stats, f, indent=2)
 print(f"Image statistics saved to {image_statistics_path}")
 
-# %% [markdown]
+   
 # # MODEL TRAINING
 # 
 # Training the model uses a training dataset for training an ML algorithm. It has sample output data and the matching input data that affects the output.
 # 
 # We train a small CNN with two convolutional layers and a wide fully connected head. The dataset is imbalanced (~21% clean / ~79% defective), so the positive class is down-weighted in the loss, and we early-stop and tune the classification threshold on the validation macro F1.
 
-# %%
+ 
 import torch.nn as nn
 import torch.optim as optim
 
@@ -553,7 +513,7 @@ class SimpleCNN(nn.Module):
 
         return x
 
-# %%
+ 
 from sklearn.metrics import (
     accuracy_score,
     classification_report,
@@ -722,7 +682,7 @@ def train_cnn_model(train_loader, val_loader, num_epochs=num_epochs, learning_ra
 
     return model, history
 
-# %%
+ 
 def evaluate_cnn_model(model, test_loader, device=device, threshold=threshold):
     """Evaluate the model on the test set: accuracy, F1, precision, recall, ROC-AUC."""
     print(f"\n{'='*60}")
@@ -794,7 +754,7 @@ def evaluate_cnn_model(model, test_loader, device=device, threshold=threshold):
         'classification_report': class_report,
     }
 
-# %%
+ 
 def tune_threshold(model, val_loader, device=device, threshold_range=None):
     """Tune the classification threshold to maximize macro F1 on the validation set.
 
@@ -850,12 +810,12 @@ def tune_threshold(model, val_loader, device=device, threshold_range=None):
 
     return best_threshold
 
-# %% [markdown]
+   
 # # Run training
 # 
 # Everything from here on logs to a single MLflow run.
 
-# %%
+ 
 print_section_header("CNN MODEL TRAINING")
 
 torch.manual_seed(random_state)
@@ -897,12 +857,12 @@ optimal_threshold = tune_threshold(cnn_model, val_loader, device=device)
 # Evaluate on test set with optimal threshold
 test_results = evaluate_cnn_model(cnn_model, test_loader, device=device, threshold=optimal_threshold)
 
-# %% [markdown]
+   
 # # Drift baseline
 # 
 # For drift detection we store the statistics of the model on the validation set as a baseline: image statistics per channel, class distribution, prediction distribution, confidence statistics, and the mean/std of the embeddings from the `fc1` layer. The serving endpoint compares live traffic against this baseline.
 
-# %%
+ 
 def compute_baseline_statistics(model, data_loader, device=device, feature_layer="fc1", threshold=threshold):
     """Compute baseline statistics for drift detection from a dataset."""
     print(f"\nComputing baseline statistics for drift detection...")
@@ -1040,12 +1000,12 @@ mlflow.log_metric("baseline_confidence_mean", baseline_stats['confidence_statist
 mlflow.log_metric("baseline_confidence_std", baseline_stats['confidence_statistics']['std'])
 mlflow.log_artifact(drift_baseline_stats_path, "drift_detection")
 
-# %% [markdown]
+   
 # # Logging wrapper
 # 
 # The model we actually serve is a pyfunc wrapper around the CNN: it accepts an image path, raw bytes or a base64 string, applies the training transform, returns predictions and confidences, and appends every request to a log file that the drift check later reads.
 
-# %%
+ 
 import base64
 from datetime import datetime, timezone
 from io import BytesIO
@@ -1245,12 +1205,12 @@ class SimpleLoggingWrapper(mlflow.pyfunc.PythonModel):
 
 print("SimpleLoggingWrapper defined")
 
-# %% [markdown]
+   
 # # Save model artifacts
 # 
 # Saves the checkpoint and the results locally and logs the pyfunc model (wrapped with the optimal threshold from the tuning) as the model artifact of the run.
 
-# %%
+ 
 print("\nSaving model artifacts...")
 
 # Save model state dict
@@ -1276,12 +1236,12 @@ wrapper = SimpleLoggingWrapper(model=cnn_model)
 mlflow.pyfunc.log_model("model_pyfunc", python_model=wrapper)
 print("Logged pyfunc model to the MLflow run")
 
-# %% [markdown]
+   
 # # MODEL REGISTRATION
 # 
 # In this section we register the trained model in the model registry and promote it to production if it performs better than the current production model.
 
-# %%
+ 
 import time
 from mlflow.tracking.client import MlflowClient
 from mlflow.entities.model_registry.model_version_status import ModelVersionStatus
@@ -1327,7 +1287,7 @@ client.set_registered_model_alias(name=model_name, alias="best", version=str(mod
 print(f"Successfully transitioned {model_name} version {model_details.version} to Staging")
 pprint(dict(model_details))
 
-# %%
+ 
 mlflow.end_run()
 
 print("\n" + "=" * 50)
@@ -1341,41 +1301,7 @@ print(f"  Optimal threshold: {optimal_threshold:.4f}")
 print(f"  Test F1-score: {test_results['f1_score']:.4f}")
 print(f"  Registered model: {model_name} version {model_details.version} (Staging)")
 
-# %% [markdown]
-# # Legacy tabular models (deprecated)
-# 
-# Before the images arrived from the line we trained on the tabular lead dataset. Keeping the old training code here for reference in case we ever need to go back.
-# 
-# # from xgboost import XGBRFClassifier
-# # from sklearn.linear_model import LogisticRegression
-# # from sklearn.model_selection import RandomizedSearchCV
-# # from scipy.stats import uniform, randint
-# # import joblib
-# 
-# # model = XGBRFClassifier(random_state=random_state, n_estimators=100)
-# # params = {
-# #     "learning_rate": uniform(1e-2, 3e-1),
-# #     "min_split_loss": uniform(0, 10),
-# #     "max_depth": randint(3, 10),
-# #     "subsample": uniform(0, 1),
-# #     "objective": ["reg:squarederror", "binary:logistic", "reg:logistic"],
-# #     "eval_metric": ["aucpr", "error"],
-# # }
-# # model_grid = RandomizedSearchCV(model, param_distributions=params, n_jobs=-1, verbose=3, n_iter=10, cv=10)
-# # model_grid.fit(X_train, y_train)
-# 
-# # mlflow.sklearn.autolog(log_input_examples=True, log_models=False)
-# # with mlflow.start_run() as lr_run:
-# #     model = LogisticRegression(max_iter=1000)
-# #     params = {"solver": ["newton-cg", "lbfgs", "liblinear", "sag", "saga"],
-# #              "penalty": ["none", "l1", "l2", "elasticnet"],
-# #              "C": [100, 10, 1.0, 0.1, 0.01]}
-# #     model_grid = RandomizedSearchCV(model, param_distributions=params, verbose=3, n_iter=10, cv=3)
-# #     model_grid.fit(X_train, y_train)
-# #     joblib.dump(value=model_grid.best_estimator_, filename=artifact_dir + "/logistic_regression_model.pkl")
-# #     mlflow.pyfunc.log_model('model', python_model=lr_wrapper(model_grid.best_estimator_))
-
-# %% [markdown]
+   
 # # Done
 # 
 # The training job leaves behind:
