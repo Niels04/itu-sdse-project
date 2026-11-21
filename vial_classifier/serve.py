@@ -1,19 +1,14 @@
-
 # SERVE THE MODEL LOCALLY
 
-# Serving runs the MLflow scoring server (the pyfunc model) as a subprocess on an internal port, with a small FastAPI wrapper in 
-# front of it:
-#     - GET  `/health`      -> `{"status": "ok"}` once the scoring server is up, `"loading"` (503) while it loads, 
-# `"error"` (503) if it died
-#     - POST `/invocations` -> forwarded unchanged to the scoring server
-#     - POST `/infer`       -> alias of `/invocations`
-#     - GET  `/version`     -> the model version and training timestamp of the served model
-#     - GET  `/drift`       -> drift detection (KS tests) over the requests logged by the scoring server
+# Serving runs the MLflow scoring server (the pyfunc model) as a subprocess on an internal port, with a small 
+# FastAPI wrapper in front of it:
 
-# Background for readers who only know `mlflow models serve`: that command also starts a web server under the hood (it launches 
-# a uvicorn process running a FastAPI app - the same stack used here). 
-# We just do the same thing explicitly so we control the response bodies: MLflow's own `/health` answers with a bare newline, 
-# which JSON clients reject.
+# - GET  `/health`      -> `{"status": "ok"}` once the scoring server is up, `"loading"` (503) while it loads, 
+# `"error"` (503) if it died
+# - POST `/invocations` -> forwarded unchanged to the scoring server
+# - POST `/infer`       -> alias of `/invocations`
+# - GET  `/version`     -> the model version and training timestamp of the served model
+# - GET  `/drift`       -> drift detection (KS tests) over the requests logged by the scoring server
 
 model_name = "cnn_model"
 experiment_name = "vial_image_classification"
@@ -56,8 +51,6 @@ os.makedirs("mlflow-state", exist_ok=True)
 
 import pandas as pd
 import numpy as np
-import mlflow
-from mlflow.tracking import MlflowClient
 from pprint import pprint
 import warnings
 
