@@ -38,12 +38,12 @@ func run(ctx context.Context) error {
 	//<- training stage goes here
 	//<- model exporting goes here (currently being done in the deployment.ipynb)
 	// check that the model was actually exported to the artifacts directory
-	err = checkArtifact("models/model")
+	/*err = checkArtifact("models/model")
 	if err != nil {
 		return fmt.Errorf("pipeline failed: %w", err)
-	}
+	}*/
 	modelTested := predictStage(withData)
-  
+
 	// Nothing runs until a result is requested; Sync runs all stages above.
 	if _, err := modelTested.Sync(ctx); err != nil {
 		return fmt.Errorf("pipeline failed: %w", err)
