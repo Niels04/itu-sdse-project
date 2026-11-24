@@ -15,8 +15,8 @@ func TestImageRef(t *testing.T) {
 		want    string
 		wantErr bool
 	}{
-		{"lowercase owner", "niels04", "abc123", "ghcr.io/niels04/itu-sdse-project:abc123", false},
-		{"uppercase owner", "Niels04", "abc123", "ghcr.io/niels04/itu-sdse-project:abc123", false},
+		{"lowercase owner", "niels04", "abc123", "ghcr.io/niels04/model-serve:abc123", false},
+		{"uppercase owner", "Niels04", "abc123", "ghcr.io/niels04/model-serve:abc123", false},
 		{"empty sha", "niels04", "", "", true},
 		{"empty owner", "", "abc123", "", true},
 	}
