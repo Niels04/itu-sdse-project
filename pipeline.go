@@ -42,11 +42,10 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("pipeline failed: %w", err)
 	}
-
-	//<- model test stage goes here
-
+	modelTested := predictStage(withData)
+  
 	// Nothing runs until a result is requested; Sync runs all stages above.
-	if _, err := withData.Sync(ctx); err != nil {
+	if _, err := modelTested.Sync(ctx); err != nil {
 		return fmt.Errorf("pipeline failed: %w", err)
 	}
 	fmt.Println("Pipeline finished")
@@ -95,8 +94,13 @@ func baseContainer(client *dagger.Client) *dagger.Container {
 		WithExec([]string{"uv", "sync", "--frozen"})
 }
 
-// unitTestStage runs the tests in tests/ with pytest.
+// unitTestStage runs the tests in tests/test_units.py with pytest. (so only the unit tests)
 func unitTestStage(c *dagger.Container) *dagger.Container {
+	return c.WithExec([]string{"uv", "run", "pytest", "tests/test_units.py"})
+}
+
+// model prediction test stage runs all tests in tests/ with pytest.
+func predictStage(c *dagger.Container) *dagger.Container {
 	return c.WithExec([]string{"uv", "run", "pytest"})
 }
 

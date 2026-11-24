@@ -1,5 +1,35 @@
 # ITU BDS MLOPS'26 - Project (V2)
 
+## Setup Guide
+
+Follow these steps to clone, set up, and run the project locally:
+
+1. **Clone the repository:**
+   ```bash
+   git clone git@github.com:Niels04/itu-sdse-project.git
+   ```
+
+2. **Navigate into the project directory:**
+   ```bash
+   cd itu-sdse-project
+   ```
+
+3. **Restore the project environment:**
+   ```bash
+   uv sync
+   ```
+
+4. **Run the pipeline:**
+   ```bash
+   go run pipeline.go
+   ```
+   This command executes the pipeline, which automatically:
+   * Pulls data from DVC
+   * Trains the model
+   * Conducts unit tests
+   * Packages the model into a Docker container and saves it locally
+    ``
+
 ## Task
 
 Based on the input provided (see below), fork the repository and restructure the code to adhere to the concepts and ideas you have seen throughout the course. The diagram below provides a detailed overview of the structure that the solution is expected to follow.
