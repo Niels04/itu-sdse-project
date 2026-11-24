@@ -114,7 +114,7 @@ func imageRef(owner, sha string) (string, error) {
 		return "", errors.New("owner and sha must not be empty")
 	}
 	// GHCR only accepts lowercase names, so "Niels04" becomes "niels04".
-	return "ghcr.io/" + strings.ToLower(owner) + "/itu-sdse-project:" + sha, nil
+	return "ghcr.io/" + strings.ToLower(owner) + "/model-serve:" + sha, nil
 
 }
 
