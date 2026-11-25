@@ -1,5 +1,5 @@
 This guide outlines a step by step process for hosting the project on azure once you have a working docker image on ghcr.io
-ANYTHING MARKED WITH <text> needs to be replaced by your own text. 
+ANYTHING MARKED WITH `<text>` needs to be replaced by your own text. 
 
 Install az cli tool
 MacOs:
@@ -29,7 +29,7 @@ Create RG in the right region
 ```console
 RG=mlops-itu-rg
 ENV=mlops-itu-env
-LOC=norwayeast
+LOC=<location available to your account>
 
 az group create --name $RG --location $LOC
 az containerapp env create --name $ENV --resource-group $RG --location $LOC
@@ -40,6 +40,7 @@ Substitute infra fields with az query output
 SUB=$(az account show --query id -o tsv)
 OWNER=<your-github-user-lowercase>
 TAG=<your-image-tag>
+GHCR_TOKEN=<your ghcr classic token with package read access>
 
 sed \
   -e "s/__OWNER__/$OWNER/" \
@@ -47,12 +48,14 @@ sed \
   -e "s/__SUBSCRIPTION_ID__/$SUB/" \
   -e "s/__RESOURCE_GROUP__/$RG/" \
   -e "s/__ENVIRONMENT__/$ENV/" \
-  ./infra/azure/app.yml > /tmp/app.rendered.yml
+  -e "s/__LOCATION__/$LOC/" \
+  -e "s/__GHCR_TOKEN__/$GHCR_TOKEN/" \
+  ./infra/azure/app.yaml > /tmp/app.rendered.yaml
 
 az containerapp create \
   --name mlops-itu-jtk \
   --resource-group $RG \
-  --yaml /tmp/app.rendered.yml  
+  --yaml /tmp/app.rendered.yaml  
 ```
 
 If new image needs to be pushed here's the update command

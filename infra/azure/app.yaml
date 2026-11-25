@@ -12,6 +12,7 @@
 #   __SUBSCRIPTION_ID__  your Azure subscription ID
 #   __RESOURCE_GROUP__   resource group holding the Container Apps environment
 #   __ENVIRONMENT__      name of the Container Apps environment
+#   __LOCATION__         location (region) available to your account
 #
 # Deploy with:
 #   az containerapp create -g __RESOURCE_GROUP__ --yaml azure-app.yml
@@ -20,7 +21,7 @@
 name: mlops-itu-jtk
 type: Microsoft.App/containerApps
 # Frankfurt equivalent of fra1. Must match the environment's region.
-location: Norway East
+location: __LOCATION__
 
 properties:
   managedEnvironmentId: /subscriptions/__SUBSCRIPTION_ID__/resourceGroups/__RESOURCE_GROUP__/providers/Microsoft.App/managedEnvironments/__ENVIRONMENT__
@@ -35,11 +36,18 @@ properties:
       targetPort: 5001      # must match the port uvicorn listens on
       transport: auto
       allowInsecure: false  # redirect HTTP -> HTTPS
+    secrets:
+      - name: ghcr-token
+        value: __GHCR_TOKEN__
+    registries:
+      - server: ghcr.io
+        username: __OWNER__
+        passwordSecretRef: ghcr-token
 
   template:
     containers:
       - name: model-serve
-        image: ghcr.io/__OWNER__/model-serve:__TAG__
+        image: ghcr.io/__OWNER__/model-serve:latest
         resources:
           # Consumption plan only allows fixed CPU/memory pairs; 1 vCPU
           # pairs with 2Gi. For 1Gi of RAM use cpu: 0.5 instead.
