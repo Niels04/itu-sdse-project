@@ -39,6 +39,7 @@ model_path = export_dir
 #  - we log to a local sqlite db so no tracking server has to be running
 experiment_name = "vial_image_classification"
 model_name = "cnn_model"
+mlflow_state_dir = "mlflow-state"
 mlflow_tracking_uri = f"sqlite:///{mlflow_state_dir}/mlflow.db"
 mlflow_artifact_location = "./mlflow-state/artifacts"
 
@@ -46,7 +47,6 @@ artifact_path = "model_pyfunc"
 
 model_version = 1  # fallback, the real version is looked up from the registry
 
-mlflow_state_dir = "mlflow-state"
 drift_baseline_stats_path = artifact_dir + "/drift_baseline_stats.json"
 inference_log_path = artifact_dir + "/inference_log.json"
 model_results_path = artifact_dir + "/model_results.json"
