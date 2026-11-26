@@ -29,3 +29,10 @@ jobs:
           verb: run
           args: go run pipeline.go
           version: "0.21.11"
+
+      - name: Upload model artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: model
+          path: models/model
+          if-no-files-found: error
