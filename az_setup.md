@@ -39,12 +39,10 @@ Substitute infra fields with az query output
 ```console
 SUB=$(az account show --query id -o tsv)
 OWNER=<your-github-user-lowercase>
-TAG=<your-image-tag>
 GHCR_TOKEN=<your ghcr classic token with package read access>
 
 sed \
   -e "s/__OWNER__/$OWNER/" \
-  -e "s/__TAG__/$TAG/" \
   -e "s/__SUBSCRIPTION_ID__/$SUB/" \
   -e "s/__RESOURCE_GROUP__/$RG/" \
   -e "s/__ENVIRONMENT__/$ENV/" \
