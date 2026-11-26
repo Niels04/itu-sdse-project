@@ -1,26 +1,24 @@
-# Azure Container Apps spec: the equivalent of the DigitalOcean App Platform
-# "app spec". It runs the model-serving Docker image from ghcr.io. Your
-# pipeline builds and pushes the image; Azure only pulls and runs it.
+# Azure Container Apps spec. It runs the model-serving Docker image from
+# ghcr.io. Our pipeline builds and pushes the image; Azure only pulls and
+# runs it.
 #
-# One-time setup: make the GHCR package public (Package settings -> Change
-# visibility) so Azure can pull it without credentials. If you keep it private,
-# add a `registries` entry plus a secret (see the note below the spec).
+# Azure logs in to GHCR with a token (see `secrets` and `registries` below).
 #
-# Placeholders to fill in from your pipeline / Azure setup:
+# Placeholders, filled in by the sed command in az_setup.md:
 #   __OWNER__            GitHub user or org, lowercased (ghcr.io/__OWNER__/model-serve)
-#   __TAG__              exact image tag your pipeline pushed (e.g. commit SHA)
 #   __SUBSCRIPTION_ID__  your Azure subscription ID
 #   __RESOURCE_GROUP__   resource group holding the Container Apps environment
 #   __ENVIRONMENT__      name of the Container Apps environment
 #   __LOCATION__         location (region) available to your account
+#   __GHCR_TOKEN__       GHCR classic token with package read access
 #
-# Deploy with:
-#   az containerapp create -g __RESOURCE_GROUP__ --yaml azure-app.yml
-#   (use `az containerapp update ... --yaml` for later changes)
+# Deploy: follow az_setup.md, which fills in the placeholders and runs
+# `az containerapp create`. New images are deployed with
+# `az containerapp update --image ...`.
 
 name: mlops-itu-jtk
 type: Microsoft.App/containerApps
-# Frankfurt equivalent of fra1. Must match the environment's region.
+# Must match the region of the Container Apps environment.
 location: __LOCATION__
 
 properties:

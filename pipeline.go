@@ -35,42 +35,46 @@ func run(ctx context.Context) error {
 	base := baseContainer(client)
 	tested := unitTestStage(base)
 	withData := dataStage(tested)
-	//<- training stage goes here
-	//<- model exporting goes here (currently being done in the deployment.ipynb)
-	// check that the model was actually exported to the artifacts directory
-	/*err = checkArtifact("models/model")
-	if err != nil {
-		return fmt.Errorf("pipeline failed: %w", err)
-	}*/
-	modelTested := predictStage(withData)
+
+	trained := trainStage(withData)
+	exported := exportStage(trained)
+	modelTested := predictStage(exported)
 
 	// Nothing runs until a result is requested; Sync runs all stages above.
 	if _, err := modelTested.Sync(ctx); err != nil {
 		return fmt.Errorf("pipeline failed: %w", err)
 	}
+
+	// Copy the tested model and the results from the container to the host.
+	if _, err := modelTested.Directory("/app/models/model").Export(ctx, "models/model"); err != nil {
+		return fmt.Errorf("export model: %w", err)
+	}
+	if _, err := modelTested.Directory("/app/artifacts").Export(ctx, "artifacts"); err != nil {
+		return fmt.Errorf("export artifacts: %w", err)
+	}
+	// Stop if the exported folder is not a complete MLflow model.
+	if err := checkArtifact("models/model"); err != nil {
+		return fmt.Errorf("pipeline failed: %w", err)
+	}
+
 	fmt.Println("Pipeline finished")
 
 	// Here will be the pipeline part that produces the serving container:
 	// (for now this just prints the image reference under which the image will be published to ghcr.io)
 
-	// get the sha of the current commit
-	sha, err := currentCommitSHA()
-	if err != nil {
-		return fmt.Errorf("pipeline failed: %w", err)
-	}
-	// construct the image reference from the sha
-	imgRef, err := imageRef("Niels04", sha)
-	if err != nil {
-		return fmt.Errorf("pipeline failed: %w", err)
-	}
-	fmt.Println(imgRef) // <- replace this with publishing the container
-
-	// Only publish as "latest" if the current branch is the main branch:
+	// Only publish if on main branch:
 	if os.Getenv("GITHUB_REF") == "refs/heads/main" {
-		imgRef, err := imageRef("Niels04", "latest")
+		// get the sha of the current commit
+		sha, err := currentCommitSHA()
 		if err != nil {
 			return fmt.Errorf("pipeline failed: %w", err)
 		}
+		// construct the image reference from the sha
+		imgRef, err := imageRef("Niels04", sha)
+		if err != nil {
+			return fmt.Errorf("pipeline failed: %w", err)
+		}
+
 		fmt.Println(imgRef) // <- replace this with publishing the container
 	}
 
@@ -105,9 +109,18 @@ func predictStage(c *dagger.Container) *dagger.Container {
 }
 
 // dataStage fetches the metadata files tracked by DVC.
-// The image download is added when the training script is merged.
 func dataStage(c *dagger.Container) *dagger.Container {
 	return c.WithExec([]string{"uv", "run", "dvc", "pull"})
+}
+
+// trainStage downloads the images and trains the model with the training script.
+func trainStage(c *dagger.Container) *dagger.Container {
+	return c.WithExec([]string{"uv", "run", "python", "vial_classifier/modeling/train.py"})
+}
+
+// exportStage registers the best run and exports the servable model to models/model.
+func exportStage(c *dagger.Container) *dagger.Container {
+	return c.WithExec([]string{"uv", "run", "python", "vial_classifier/modeling/export.py"})
 }
 
 // ------- UTILITY FUNCTIONS

@@ -54,7 +54,7 @@ You are given the following material:
 - Python monoliths (see `notebooks` folder)
 - Raw input data (pulled from the object store by the training notebook)
 - Group login to https://sdse-event-engine-r5ih8.ondigitalocean.app/ for monitoring deployed model
-- DigitalOcean App Platform spec for the deployment (see `infra/digitalocean/app.yaml`)
+- Azure Container Apps spec for the deployment (see `infra/azure/app.yaml` and `az_setup.md`)
 
 ## Outputs
 
@@ -63,7 +63,7 @@ You are given the following material:
   - GitHub automation workflow
   - Dagger workflow (in Go)
 - Model artifacts produced by GitHub workflow
-- Hosted endpoint in DigitalOcean
+- Hosted endpoint in Azure
   - /health that returns {"status": "ok"}
   - /invocations that take binary image payload
   - /drift that returns model/data drift information
