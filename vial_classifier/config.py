@@ -21,7 +21,6 @@ transform_std = [0.229, 0.224, 0.225]
 
 # Paths (relative to the project root)
 artifact_dir = "artifacts"
-mlflow_state_dir = "mlflow-state"
 image_data_dir = "./data/images/raw"
 metadata_path = "./data/images/metadata.csv"
 test_data_dir = "./data/test"

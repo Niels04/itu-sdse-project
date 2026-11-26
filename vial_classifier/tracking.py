@@ -2,6 +2,12 @@
 import os
 import mlflow
 
+from vial_classifier.config import (
+    mlflow_state_dir,
+    mlflow_tracking_uri,
+    mlflow_artifact_location
+)
+
 def setup_mlflow_tracking(experiment_name=None):
     """Point MLflow at the local state dir and create the experiment if needed."""
     os.makedirs(mlflow_state_dir, exist_ok=True)
