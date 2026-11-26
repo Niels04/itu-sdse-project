@@ -53,24 +53,19 @@ func run(ctx context.Context) error {
 	// Here will be the pipeline part that produces the serving container:
 	// (for now this just prints the image reference under which the image will be published to ghcr.io)
 
-	// get the sha of the current commit
-	sha, err := currentCommitSHA()
-	if err != nil {
-		return fmt.Errorf("pipeline failed: %w", err)
-	}
-	// construct the image reference from the sha
-	imgRef, err := imageRef("Niels04", sha)
-	if err != nil {
-		return fmt.Errorf("pipeline failed: %w", err)
-	}
-	fmt.Println(imgRef) // <- replace this with publishing the container
-
-	// Only publish as "latest" if the current branch is the main branch:
+	// Only publish if on main branch:
 	if os.Getenv("GITHUB_REF") == "refs/heads/main" {
-		imgRef, err := imageRef("Niels04", "latest")
+		// get the sha of the current commit
+		sha, err := currentCommitSHA()
 		if err != nil {
 			return fmt.Errorf("pipeline failed: %w", err)
 		}
+		// construct the image reference from the sha
+		imgRef, err := imageRef("Niels04", sha)
+		if err != nil {
+			return fmt.Errorf("pipeline failed: %w", err)
+		}
+
 		fmt.Println(imgRef) // <- replace this with publishing the container
 	}
 
