@@ -25,13 +25,11 @@ from vial_classifier.config import (
     class_names_path,
     image_statistics_path,
     inference_log_path,
+    experiment_name,
+    model_name,
+    mlflow_tracking_uri,#<- why do we need this? It's never used.
+    mlflow_artifact_location
 )
-
-# MLflow - we log to a local sqlite db so no tracking server has to be running
-experiment_name = "vial_image_classification"
-model_name = "cnn_model"
-mlflow_tracking_uri = f"sqlite:///{mlflow_state_dir}/mlflow.db"
-mlflow_artifact_location = "./mlflow-state/artifacts"
 
 print("Configuration loaded")
 
@@ -63,20 +61,7 @@ pd.set_option('display.float_format', lambda x: "%.3f" % x)
 # Everything MLflow-related (runs, metrics, the model registry) logs to the local state directory `mlflow-state/`: a SQLite database plus the artifacts. No MLflow server needs to be running.
 
  
-import mlflow
-
-def setup_mlflow_tracking(experiment_name=None):
-    """Point MLflow at the local state dir and create the experiment if needed."""
-    os.makedirs(mlflow_state_dir, exist_ok=True)
-    mlflow.set_tracking_uri(mlflow_tracking_uri)
-
-    if experiment_name is None:
-        return
-
-    experiment = mlflow.get_experiment_by_name(experiment_name)
-    if experiment is None:
-        mlflow.create_experiment(experiment_name, artifact_location=mlflow_artifact_location)
-    mlflow.set_experiment(experiment_name)
+from vial_classifier.tracking import setup_mlflow_tracking
 
 
 

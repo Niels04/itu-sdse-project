@@ -32,3 +32,30 @@ drift_baseline_stats_path = artifact_dir + "/drift_baseline_stats.json"
 class_names_path = artifact_dir + "/class_names.json"
 image_statistics_path = artifact_dir + "/image_statistics.json"
 inference_log_path = artifact_dir + "/inference_log.json"
+
+# MLflow setup:
+#  - we log to a local sqlite db so no tracking server has to be running
+experiment_name = "vial_image_classification"
+model_name = "cnn_model"
+mlflow_tracking_uri = f"sqlite:///{mlflow_state_dir}/mlflow.db"
+mlflow_artifact_location = "./mlflow-state/artifacts"
+
+artifact_path = "model_pyfunc"
+
+model_version = 1  # fallback, the real version is looked up from the registry below
+
+mlflow_state_dir = "mlflow-state"
+drift_baseline_stats_path = artifact_dir + "/drift_baseline_stats.json"
+inference_log_path = artifact_dir + "/inference_log.json"
+model_results_path = artifact_dir + "/model_results.json"
+drift_default_days = 7
+drift_ks_pvalue_threshold = 0.05
+
+# Where the exported servable model goes (this is what gets baked into the Docker image)
+export_dir = "models/model"
+model_path = export_dir
+
+# Serving ports
+port = 5001
+upstream_port = 5002
+upstream_host = "127.0.0.1"
