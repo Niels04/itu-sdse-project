@@ -63,8 +63,6 @@ pd.set_option('display.float_format', lambda x: "%.3f" % x)
  
 from vial_classifier.tracking import setup_mlflow_tracking
 
-
-
    
 # # READ DATA
 # 
