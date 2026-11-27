@@ -10,31 +10,27 @@
 # - GET  `/version`     -> the model version and training timestamp of the served model
 # - GET  `/drift`       -> drift detection (KS tests) over the requests logged by the scoring server
 
-model_name = "cnn_model"
-experiment_name = "vial_image_classification"
-artifact_path = "model_pyfunc"
-
-model_version = 1  # fallback, the real version is looked up from the registry below
-
-artifact_dir = "artifacts"
-mlflow_state_dir = "mlflow-state"
-drift_baseline_stats_path = artifact_dir + "/drift_baseline_stats.json"
-inference_log_path = artifact_dir + "/inference_log.json"
-model_results_path = artifact_dir + "/model_results.json"
-drift_default_days = 7
-drift_ks_pvalue_threshold = 0.05
-
-# Where the exported servable model goes (this is what gets baked into the Docker image)
-export_dir = "models/model"
-model_path = export_dir
-
-# Serving ports
-port = 5001
-upstream_port = 5002
-upstream_host = "127.0.0.1"
+from vial_classifier.config import (
+    model_name,
+    experiment_name,
+    artifact_path,
+    model_version,
+    artifact_dir,
+    mlflow_state_dir,
+    drift_baseline_stats_path,
+    inference_log_path,
+    model_results_path,
+    drift_default_days,
+    drift_ks_pvalue_threshold,
+    export_dir,
+    model_path,
+    port,
+    upstream_port,
+    upstream_host
+)
 
 # Where the endpoint lives in production
-PROD_ENDPOINT = "https://mlops-itu-jtk.ondigitalocean.app"
+PROD_ENDPOINT = "https://mlops-itu-jtk.ondigitalocean.app"# what does this do? It is never used...
 
 print("Configuration loaded")
 

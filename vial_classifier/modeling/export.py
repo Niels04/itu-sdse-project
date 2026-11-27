@@ -1,31 +1,17 @@
 # dbutils.widgets.text("Model version", "1")
 # model_version = dbutils.widgets.get("Model version")
 
-model_name = "cnn_model"
-experiment_name = "vial_image_classification"
-artifact_path = "model_pyfunc"
-
-model_version = 1  # fallback, the real version is looked up from the registry below
-
-artifact_dir = "artifacts"
-mlflow_state_dir = "mlflow-state"
-drift_baseline_stats_path = artifact_dir + "/drift_baseline_stats.json"
-inference_log_path = artifact_dir + "/inference_log.json"
-model_results_path = artifact_dir + "/model_results.json"
-drift_default_days = 7
-drift_ks_pvalue_threshold = 0.05
-
-# Where the exported servable model goes (this is what gets baked into the Docker image)
-export_dir = "models/model"
-model_path = export_dir
-
-# Serving ports
-port = 5001
-upstream_port = 5002
-upstream_host = "127.0.0.1"
-
-# Where the endpoint lives in production
-PROD_ENDPOINT = "https://mlops-itu-jtk.ondigitalocean.app"
+from vial_classifier.config import (
+    artifact_path,
+    model_name,
+    experiment_name,
+    artifact_path,
+    artifact_dir,
+    mlflow_state_dir,
+    model_results_path,
+    export_dir,
+    model_path
+)
 
 print("Configuration loaded")
 
@@ -37,8 +23,8 @@ from pathlib import Path
 if os.path.basename(os.getcwd()) == "notebooks":
     os.chdir("..")
 
-os.makedirs("artifacts", exist_ok=True)
-os.makedirs("mlflow-state", exist_ok=True)
+os.makedirs(artifact_dir, exist_ok=True)
+os.makedirs(mlflow_state_dir, exist_ok=True)
 
 import pandas as pd
 import numpy as np
