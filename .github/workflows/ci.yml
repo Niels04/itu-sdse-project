@@ -31,7 +31,7 @@ jobs:
           version: "0.21.11"
 
       - name: Upload model artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: model
           path: models/model
